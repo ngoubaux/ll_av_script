@@ -1,62 +1,43 @@
 # Installation 
- - Install python 3
- - requirements
-   pip install -r requirements.txt
+The script needs extra tools:
+ mediainfo: brew install mediainfo
+ ffmpeg: brew install ffmpeg" 
+ realpath: brew install coreutils
 
-# Usage 
-Copy files into the folder inputs
-Run the script ./ll_av_script.py
-Get files from the folder outputs
+# Run
+Put all mov files into "inputs" folder
+Run the script ./convert_mov_mutlichan_to60.sh
 
+The modified mov file are going to be in 'outputs' folder with "_6.0" suffix.
 
-# Today we have:
-- Scenario1: edit video (mp4) with x audio files of translations (m4a)
-- Scenario2: Adding x new translations (m4a) to an already produced video with y audiotracks of translations already on (without surround)
-- Scenario3: Adding x new translations to an already produced video with y audiotracks of translations and a surround audio track already on)
+# Configuration file 
+Each mov file can have a config file (<filename>.cfg) with label or/and index of each audio tracks next to it.
+When a track index is set to -1 or it is not present in the file, the English Channel is used.
+So the output is always in 6.0.
 
-# Changelog:
-- Support Scenario 1 
-- Support Scenario 2
-- Support Scenario 3
-- Add config file (aml) to indicate language of Audiotracks if there is no metadata
-- Add metadata lang and title for each audio tracks
-- Add silence audio channel when translation is missing
-- Look in inputs folder for job
-  - Can have several video files and audio to convert.
-    One job by video file (.mov or .mp4)
-- Store outputs in outputs folder 
-   - One Video with surround track (xxx_6.0.mov)
-   - One video for each language (E(_X).mov) - where x is the lang letter.
+If no English Channel the script exits.
 
-# Known bug:
-For some ffmpeg reason, the surround channel ordre is not correct.
-But at least you can test it.
+Config file example: 
+TRACK_ENGLISH="E"
+TRACK_FRENCH="E-F"
+TRACK_GERMAN="E-G"
+TRACK_SPANISH="E-S"
+TRACK_ITALIAN="E-I"
+TRACK_CHINESE="E-C"
 
-# Input files
-## Video inputs are:
-- 20230701LN1030MJK_20231112AP.mp4 (Video only)
-- 20230701LN1030MJK_20231112AP_E_F_G_S_I.mov (Without surround track)
-- 20230701LN1030MJK_20231112AP_E_F_G_S_I_6.0.mov (With surround track)
+TRACK_ENGLISH_IDX=0
+TRACK_FRENCH_IDX=1
+TRACK_GERMAN_IDX=2
+TRACK_SPANISH_IDX=3
+TRACK_ITALIAN_IDX=4
+TRACK_CHINESE_IDX=-1
 
-## Audio inputs are:
-- 20230701LN1030MJK_20231112AP_E.m4a (English only)
-- 20230701LN1030MJK_20231112AP_E_<translation_letter>.m4a (English left and translation on right)
-- 20230701LN1030MJK_20231112AP_E_F_G_S_I.mov (Without surround track)
-- 20230701LN1030MJK_20231112AP_E_F_G_S_I_6.0.mov (With surround track)
+The audio mapping used is 6.0 (Standard)
+Better than using LFE for a classic audio voice
 
-## Config file: 
-If audio track has no lang metadata, the script needs a configuration file (.yml) that describe each track:
-
-For exemple: 
-```
-track_1: 
-  lang: E
-track_2: 
-  lang: F
-track_3: 
-  lang: G
-track_4:
-  lang: S
-track_5: 
-  lang: I
-```
+English: FL (Front Left)
+French: FR (Front RIght)
+German: FC (Front Center)
+Spanish: SL (Left Surround)
+Italian:  SR (Right Surround)
+Chinese: BC (Back Center)
