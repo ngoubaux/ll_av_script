@@ -4,6 +4,7 @@ import re
 import os
 import yaml
 import tempfile
+import exiftool
 
 debug_output=False
 # Liste des langues
@@ -25,6 +26,15 @@ def search_lang_by_md(lang_md):
         
     return ""
 
+def search_lang_by_title(lang_title):
+    for lang in languages:
+        title = re.sub("[_-]", "", languages[lang]['title']) 
+        lang_title = re.sub("[_-]", "", lang_title) 
+        if title == lang_title:
+            return lang
+        
+    return ""
+
 def extract_language_tracks(file, probe):
     # Open Config file if present
     yml         = None 
@@ -33,6 +43,9 @@ def extract_language_tracks(file, probe):
         if stream := open(yml_path):
             yml = yaml.safe_load(stream);
     
+    with exiftool.ExifToolHelper() as et:
+        metadata = et.get_metadata(file)[0]
+
     language_tracks = {}
     audio_idx       = 0
     for elt in probe["streams"]:
@@ -51,6 +64,11 @@ def extract_language_tracks(file, probe):
             lang = yml[f'track_{audio_idx+1}']['lang']
             md_lang =  languages[lang]['lang']
 
+        title_key = f"QuickTime:Track{elt['index']+1}Name"
+        if lang == "" and title_key in metadata:
+            lang = search_lang_by_title(metadata[title_key])
+            md_lang =  languages[lang]['lang']
+            
         if lang != "":
             language_tracks[lang] = {
                 'lang' : lang,
