@@ -34,19 +34,21 @@ But at least you can test it.
 
 # Input files
 ## Video inputs are:
-20230701LN1030MJK_20231112AP.mp4 (Video only)
-20230701LN1030MJK_20231112AP_E_F_G_S_I.mov (Without surround track)
-20230701LN1030MJK_20231112AP_E_F_G_S_I_6.0.mov (With surround track)
+- 20230701LN1030MJK_20231112AP.mp4 (Video only)
+- 20230701LN1030MJK_20231112AP_E_F_G_S_I.mov (Without surround track)
+- 20230701LN1030MJK_20231112AP_E_F_G_S_I_6.0.mov (With surround track)
 
 ## Audio inputs are:
-20230701LN1030MJK_20231112AP_E.m4a (English only)
-20230701LN1030MJK_20231112AP_E_<translation_letter>.m4a (English left and translation on right)
-20230701LN1030MJK_20231112AP_E_F_G_S_I.mov (Without surround track)
-20230701LN1030MJK_20231112AP_E_F_G_S_I_6.0.mov (With surround track)
+- 20230701LN1030MJK_20231112AP_E.m4a (English only)
+- 20230701LN1030MJK_20231112AP_E_<translation_letter>.m4a (English left and translation on right)
+- 20230701LN1030MJK_20231112AP_E_F_G_S_I.mov (Without surround track)
+- 20230701LN1030MJK_20231112AP_E_F_G_S_I_6.0.mov (With surround track)
 
 ## Config file: 
 If audio track has no lang metadata, the script needs a configuration file (.yml) that describe each track:
+
 For exemple: 
+```
 track_1: 
   lang: E
 track_2: 
@@ -57,3 +59,4 @@ track_4:
   lang: S
 track_5: 
   lang: I
+```
