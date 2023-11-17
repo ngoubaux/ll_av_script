@@ -5,18 +5,24 @@ import os
 import yaml
 import tempfile
 import exiftool
+import sys
 
-debug_output=False
+quiet_output=True
 # Liste des langues
 # FFMPEG is using ISO 639-2 language table
 # https://en.wikipedia.org/wiki/List_of_ISO_639-2_codes
+#
+# Channel Layout
+# http://underpop.online.fr/f/ffmpeg/help/channel-layout.htm.gz
+# https://trac.ffmpeg.org/wiki/AudioChannelManipulation
+#
 languages = {
-    'E' : { 'name':'E', 'lang': 'eng', 'title' : 'E',   'channel': 'FL', 'track_idx': -1},
-    'F' : { 'name':'F', 'lang': 'fra', 'title' : 'E_F', 'channel': 'FR', 'track_idx': -1},
-    'G' : { 'name':'G', 'lang': 'ger', 'title' : 'E_G', 'channel': 'FC', 'track_idx': -1},
-    'S' : { 'name':'S', 'lang': 'spa', 'title' : 'E_S', 'channel': 'SL', 'track_idx': -1}, 
-    'I' : { 'name':'I', 'lang': 'ita', 'title' : 'E_I', 'channel': 'SR', 'track_idx': -1},
-    'C' : { 'name':'C', 'lang': 'chi', 'title' : 'E_C', 'channel': 'BC', 'track_idx': -1},
+    'E' : { 'name':'E', 'lang': 'eng', 'title' : 'E',   'channel': 'FL', 'track_idx': -1, 'desc': 'English'},
+    'F' : { 'name':'F', 'lang': 'fra', 'title' : 'E_F', 'channel': 'FR', 'track_idx': -1, 'desc': 'French'},
+    'G' : { 'name':'G', 'lang': 'ger', 'title' : 'E_G', 'channel': 'FC', 'track_idx': -1, 'desc': 'German'},
+    'S' : { 'name':'S', 'lang': 'spa', 'title' : 'E_S', 'channel': 'SL', 'track_idx': -1, 'desc': 'Spanish'}, 
+    'I' : { 'name':'I', 'lang': 'ita', 'title' : 'E_I', 'channel': 'SR', 'track_idx': -1, 'desc': 'Italian'},
+    'C' : { 'name':'C', 'lang': 'chi', 'title' : 'E_C', 'channel': 'BC', 'track_idx': -1, 'desc': 'Chinise'},
 }
 
 def search_lang_by_md(lang_md):
@@ -96,6 +102,19 @@ def get_audio_count(probe):
 
     return audio_idx
 
+def ffmpeg_run(output_ffmpeg, force_args=0):
+    output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
+        
+    if not quiet_output or force_args:
+        print(output_ffmpeg.get_args())
+        #print(ffmpeg.compile(output_ffmpeg))
+
+    ffmpeg.run(
+        output_ffmpeg,
+        quiet=quiet_output
+    )
+
+
 def create_input_item(file, probe, has_video):
     return {
                 'file': file,
@@ -137,7 +156,7 @@ def main():
                 True
             ));
 
-            print(f"Process file {input_files[0]['file']}")
+            print(f"Process {input_files[0]['file']}")
             input_files[0]['languages'] = extract_language_tracks(input_files[0]['file'], probe)
             
             # Rechercher les fichiers audio manquants
@@ -169,6 +188,13 @@ def main():
                 languages_in_ouput_file += item['languages'].keys()
 
             output_base_file = os.path.join(output_dir, f"{base_name}")
+
+            if len(languages_in_ouput_file) == 0:
+                print (f"\t /!\ No language found: Specify languages in {input_files[0]['file']}.yml")
+                sys.exit(1)
+
+            print (f"\t Language: {' '.join(languages_in_ouput_file)}")
+
             # Créer un nouveau fichier vidéo avec les pistes audio et vidéo des fichiers d'entrée
             create_output_file(
                 input_files,
@@ -201,20 +227,22 @@ def create_output_file(
             metadatas_lang[f'metadata:s:a:{len(metadatas_lang)}'] = f"language={language['metadata_lang']}"
             metadatas_title[f'metadata:s:a:{len(metadatas_title)}'] = f"title='{language['metadata_title']}'"
             track_idx = language["audio_idx"]+stream_offset
-            languages[language['lang']]['track_idx'] = track_idx
-            surround_map.append(f'{track_idx}.FR-{language["join_chan"]}')
+            languages[language['lang']]['track_idx'] = track_idx            
         stream_offset += len(item['languages'])
 
     # Complet the surround map 
     chan_idx = stream_offset
     for language_key, lang in languages.items():
         if language_key not in languages_in_ouput_file:
-            surround_map.append(f'{chan_idx}.FR-{lang["channel"]}')
+            lang['track_idx'] = chan_idx
             chan_idx += 1
-            lang['track_idx'] = -1
+
+        surround_map.append(f'{lang["track_idx"]}.FR-{lang["channel"]}')
+            
 
     # '[0:a:0][0:a]join=inputs=6:channel_layout=6.0:map=1.0-FL|2.1-FR|3.1-FC|4.1-SL|5.1-SR|0.0-BC[ch6]' 
     #stream6_0 = ffmpeg.filter_(*surround_stream, 'join', inputs='6', channel_layout='6.0', map='|'.join(surround_map)+"[ch6]")
+    print (f"\t Video and Audio(s) Merging...")
     # 1 - Create one files with all audio tracks
     output_ffmpeg = ffmpeg.output(
         *streams, 
@@ -223,27 +251,35 @@ def create_output_file(
         acodec='copy', 
         **metadatas_lang
     )
-    output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
-    print(output_ffmpeg.get_args())
 
-    print(ffmpeg.compile(output_ffmpeg))
-    ffmpeg.run(
-        output_ffmpeg,
-        quiet=debug_output
-    )
+    ffmpeg_run(output_ffmpeg)
 
     # 2 - Create Sourrond track + title metadata
+    print (f"\t Surround track creating...")
     input_file = ffmpeg.input(output_file_tmp)
     # Create empty track
-    null_streams = []
-    for i in range(6 - stream_offset):
-        track = ffmpeg.input('anullsrc=channel_layout=stereo:sample_rate=44100', f='lavfi')
-        null_streams.append(track.audio)
+    surround_streams = []
+    for lang in languages.values():
+        # No translation to export
+        if lang['track_idx'] >= len(languages_in_ouput_file): 
+            track = ffmpeg.input('anullsrc=channel_layout=stereo:sample_rate=44100', f='lavfi')
+            surround_streams.append(track["a:0"])
+        else: 
+            surround_streams.append(input_file[f"a:{lang['track_idx']}"])
+        
 
     # Extract channel and join them
-    surround_input = ffmpeg.filter(
-        (input_file.audio, *null_streams),
+    surround_input = ffmpeg.filter_(
+        (
+            surround_streams[0], 
+            surround_streams[1], 
+            surround_streams[2],
+            surround_streams[3],
+            surround_streams[4],
+            surround_streams[5]
+        ),
         'join', 
+        #'amerge',
         inputs='6', 
         channel_layout='6.0', 
         map='|'.join(surround_map)
@@ -258,22 +294,18 @@ def create_output_file(
         **metadatas_title
     )
 
-    # Write the output video
-    output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
-    #output_ffmpeg.view(True, "view_ffmpeg")
-    print(output_ffmpeg.get_args())
-    output_ffmpeg.run(
-        quiet=debug_output
-    )
+    ffmpeg_run(output_ffmpeg)
     os.remove(output_file_tmp)
 
     # Create one mov file for each lang
     for lang in languages.values():
         # No translation to export
-        if lang['track_idx'] == -1: 
+        if lang['track_idx'] >= len(languages_in_ouput_file): 
             continue
 
-        # 2 - Create Sourrond track + title metadata
+        # 2 - Create individual file
+        print (f"\t {lang['desc']} video generating...")
+
         input_file = ffmpeg.input(output_file)
         suffix = lang['title']
         output_single_file = f"{output_base_file}_{suffix}.mov"
@@ -287,19 +319,7 @@ def create_output_file(
             **{f'metadata:s:a:0': f"title='{lang['title']}'"},
         )
 
-        # Write the output video
-        output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
-        #output_ffmpeg.view(True, "view_ffmpeg")
-        print(output_ffmpeg.get_args())
-        output_ffmpeg.run(
-            quiet=debug_output
-        )
-
-
-    #probe = ffmpeg.probe(output_file)
-    #print(json.dumps(probe,indent=2))
-
-
+        ffmpeg_run(output_ffmpeg)
 
 if __name__ == "__main__":
     main()
