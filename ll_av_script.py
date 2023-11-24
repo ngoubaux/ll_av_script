@@ -102,6 +102,32 @@ def get_audio_count(probe):
 
     return audio_idx
 
+def get_max_audio_duration(probe, audio_duration=0):
+    for elt in probe["streams"]:
+    
+        # Get Track language with Metadata
+        if elt['codec_type'] != 'audio':
+            continue
+
+        duration = round(float(elt['duration']))
+        if duration > audio_duration: 
+            audio_duration = duration
+    
+    return audio_duration
+
+def get_video_duration(probe):
+    duration       = 0
+    for elt in probe["streams"]:
+    
+        # Get Track language with Metadata
+        if elt['codec_type'] != 'video':
+            continue
+        
+        duration = round(float(elt['duration']))
+        break;
+        
+    return duration
+
 def ffmpeg_run(output_ffmpeg, force_args=0):
     output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
         
@@ -114,13 +140,28 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
         quiet=quiet_output
     )
 
+def get_video_resolution(probe):
+    for elt in probe["streams"]:
+    
+        # Get Track language with Metadata
+        if elt['codec_type'] != 'video':
+            continue
+        
+        return elt['width'], elt['height'], elt['r_frame_rate'], elt['codec_name']
+        
+    return 0, 0, 0
 
 def create_input_item(file, probe, has_video):
+    width, height, frame_rate, codec = get_video_resolution(probe)
     return {
                 'file': file,
                 'has_video': has_video,
                 'languages': {},
-                'audio_count': 0
+                'audio_count': 0,
+                'width' : width,
+                'height' : height,
+                'frame_rate' : frame_rate,
+                'video_codec' : codec,
             }
     
 def main():
@@ -158,6 +199,8 @@ def main():
 
             print(f"Process {input_files[0]['file']}")
             input_files[0]['languages'] = extract_language_tracks(input_files[0]['file'], probe)
+            audio_duration = get_max_audio_duration(probe)
+            video_duration = get_video_duration(probe)
             
             # Rechercher les fichiers audio manquants
             for language in languages:
@@ -170,6 +213,7 @@ def main():
 
                     if os.path.exists(input_file):
                         probe = ffmpeg.probe(input_file)
+                        audio_duration = get_max_audio_duration(probe, audio_duration)
                         item = create_input_item(input_file, probe, False) 
                         item['languages'][language] = {
                             'lang' : language,
@@ -181,6 +225,10 @@ def main():
                         print(f"\t Add file {item['file']}")
                         languages_missing.append(language)
                         input_files.append(item) 
+
+            extra_second = 0
+            if video_duration < audio_duration:
+                extra_second = audio_duration - video_duration;
 
             # Construct output filename
             languages_in_ouput_file = []
@@ -194,19 +242,22 @@ def main():
                 sys.exit(1)
 
             print (f"\t Language: {' '.join(languages_in_ouput_file)}")
+            print (f"\t Video padding: {extra_second}s")
 
             # Créer un nouveau fichier vidéo avec les pistes audio et vidéo des fichiers d'entrée
             create_output_file(
                 input_files,
                 output_base_file,
                 languages_in_ouput_file,
+                extra_second,
             )
 
 
 def create_output_file(
     input_files,
     output_base_file,
-    languages_in_ouput_file):
+    languages_in_ouput_file,
+    extra_second):
 
     output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_6.0.mov"
     fd, output_file_tmp = tempfile.mkstemp(dir=os.path.dirname(output_file), suffix = '.mov')
@@ -214,23 +265,33 @@ def create_output_file(
     # Add Video & Audio Stream 
     # Create metadata
     streams = []
-    metadatas_lang = {}
+    metadata_langs = {}
     surround_map = []
-    metadatas_title = {}
+    metadata_titles = {}
     stream_offset = 0
+    video_codec='copy'
     for item in input_files:
         item['ffmpeg_input'] = ffmpeg.input(item['file'])
+        # Add video track to the stream
         if item['has_video']:
-            streams.append(item['ffmpeg_input']['v'])
+            if extra_second > 0:
+                video_codec = item['video_codec']
+                streams.append(ffmpeg.concat (
+                    item['ffmpeg_input']['v'], 
+                     ffmpeg.input(f"color=c=black:s={item['width']}x{item['height']}:d={extra_second}:r={item['frame_rate']}", f='lavfi')
+                ))
+            else :
+                streams.append(item['ffmpeg_input']['v'])
+            
         for language in item['languages'].values():
             streams.append(item['ffmpeg_input'][f'a:{language["audio_idx"]}'])
-            metadatas_lang[f'metadata:s:a:{len(metadatas_lang)}'] = f"language={language['metadata_lang']}"
-            metadatas_title[f'metadata:s:a:{len(metadatas_title)}'] = f"title='{language['metadata_title']}'"
+            metadata_langs[f'metadata:s:a:{len(metadata_langs)}'] = f"language={language['metadata_lang']}"
+            metadata_titles[f'metadata:s:a:{len(metadata_titles)}'] = f"title='{language['metadata_title']}'"
             track_idx = language["audio_idx"]+stream_offset
             languages[language['lang']]['track_idx'] = track_idx            
         stream_offset += len(item['languages'])
 
-    # Complet the surround map 
+    # Add the surround map 
     chan_idx = stream_offset
     for language_key, lang in languages.items():
         if language_key not in languages_in_ouput_file:
@@ -238,18 +299,17 @@ def create_output_file(
             chan_idx += 1
 
         surround_map.append(f'{lang["track_idx"]}.FR-{lang["channel"]}')
-            
-
-    # '[0:a:0][0:a]join=inputs=6:channel_layout=6.0:map=1.0-FL|2.1-FR|3.1-FC|4.1-SL|5.1-SR|0.0-BC[ch6]' 
-    #stream6_0 = ffmpeg.filter_(*surround_stream, 'join', inputs='6', channel_layout='6.0', map='|'.join(surround_map)+"[ch6]")
+                
     print (f"\t Video and Audio(s) Merging...")
+            
+        
     # 1 - Create one files with all audio tracks
     output_ffmpeg = ffmpeg.output(
         *streams, 
         output_file_tmp, 
-        vcodec='copy', 
+        vcodec=video_codec, 
         acodec='copy', 
-        **metadatas_lang
+        **metadata_langs
     )
 
     ffmpeg_run(output_ffmpeg)
@@ -290,8 +350,8 @@ def create_output_file(
         surround_input,
         output_file,
         vcodec='copy', 
-         **{f'metadata:s:a:{len(metadatas_title)}': f"title='{'_'.join(languages_in_ouput_file)}'"},
-        **metadatas_title
+         **{f'metadata:s:a:{len(metadata_titles)}': f"title='{'_'.join(languages_in_ouput_file)}'"},
+        **metadata_titles
     )
 
     ffmpeg_run(output_ffmpeg)
