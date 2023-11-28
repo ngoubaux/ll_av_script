@@ -8,6 +8,9 @@ import yaml
 import tempfile
 import exiftool
 import sys
+from colorama import Fore, Back, Style, init as colorama_init
+
+colorama_init()
 
 quiet_output=True
 # Liste des langues
@@ -19,13 +22,33 @@ quiet_output=True
 # https://trac.ffmpeg.org/wiki/AudioChannelManipulation
 #
 languages = {
-    'E' : { 'name':'E', 'lang': 'eng', 'title' : 'E',   'channel': 'FL', 'track_idx': -1, 'desc': 'English'},
-    'F' : { 'name':'F', 'lang': 'fra', 'title' : 'E_F', 'channel': 'FR', 'track_idx': -1, 'desc': 'French'},
-    'G' : { 'name':'G', 'lang': 'ger', 'title' : 'E_G', 'channel': 'FC', 'track_idx': -1, 'desc': 'German'},
-    'S' : { 'name':'S', 'lang': 'spa', 'title' : 'E_S', 'channel': 'SL', 'track_idx': -1, 'desc': 'Spanish'}, 
-    'I' : { 'name':'I', 'lang': 'ita', 'title' : 'E_I', 'channel': 'SR', 'track_idx': -1, 'desc': 'Italian'},
-    'C' : { 'name':'C', 'lang': 'chi', 'title' : 'E_C', 'channel': 'BC', 'track_idx': -1, 'desc': 'Chinise'},
+    'E' : { 'name':'E', 'lang': 'eng', 'title' : 'E',   'channel': 'FL', 'track_idx': -1, 'desc': 'English', 'old_name': 'Eng'},
+    'F' : { 'name':'F', 'lang': 'fra', 'title' : 'E_F', 'channel': 'FR', 'track_idx': -1, 'desc': 'French',  'old_name': 'Fre'},
+    'G' : { 'name':'G', 'lang': 'ger', 'title' : 'E_G', 'channel': 'FC', 'track_idx': -1, 'desc': 'German',  'old_name': 'Ger'},
+    'S' : { 'name':'S', 'lang': 'spa', 'title' : 'E_S', 'channel': 'SL', 'track_idx': -1, 'desc': 'Spanish', 'old_name': 'Spa'}, 
+    'I' : { 'name':'I', 'lang': 'ita', 'title' : 'E_I', 'channel': 'SR', 'track_idx': -1, 'desc': 'Italian', 'old_name': 'Ita'},
+    'C' : { 'name':'C', 'lang': 'chi', 'title' : 'E_C', 'channel': 'BC', 'track_idx': -1, 'desc': 'Chinese', 'old_name': 'Chi'},
 }
+
+def print_step(str):
+    print(Fore.BLUE + '==> ' + Style.RESET_ALL + Style.BRIGHT + str + Style.RESET_ALL)
+    
+def print_substep(str):
+    print(Fore.GREEN + '==> ' + Style.RESET_ALL + str + Style.RESET_ALL)
+
+def print_error(str):
+    print(Fore.RED+Style.BRIGHT+'X'+Style.NORMAL+Fore.RED+' Error: '+ Style.RESET_ALL+'Extracting ffmpeg error output...')
+    print(str)
+    print(Fore.RED+Style.BRIGHT+'X'+Style.NORMAL+Fore.RED+' Error: '+ Style.RESET_ALL+'Please watch log message behove...')
+    
+def print_warning(str):
+    print(Fore.YELLOW+Style.BRIGHT+'<!>'+Style.NORMAL+Fore.YELLOW+' Error: ' + Style.RESET_ALL+str)
+    
+def print_desc(str):
+    print(Style.DIM+str+Style.RESET_ALL)
+
+def print_addingg_file(str):
+    print(Style.DIM+'==>'+Style.RESET_ALL+str)
 
 def search_lang_by_md(lang_md):
     for lang in languages:
@@ -86,7 +109,7 @@ def extract_language_tracks(file, probe):
                 'join_chan' : languages[lang]['channel']
             }
         else:
-            print (f"Audio track_{audio_idx} is skipt") 
+            print_warning (f"Audio track_{audio_idx} is skipped") 
         
         audio_idx+=1
 
@@ -137,10 +160,16 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
         print(output_ffmpeg.get_args())
         #print(ffmpeg.compile(output_ffmpeg))
 
-    ffmpeg.run(
-        output_ffmpeg,
-        quiet=quiet_output
-    )
+    try:
+        out, err = ffmpeg.run(
+            output_ffmpeg,
+            quiet=quiet_output,
+            capture_stderr=True
+        )
+    except ffmpeg.Error as e:
+        print_error(e.stderr.decode('utf-8'))
+        return False
+    return True
 
 def get_video_resolution(probe):
     for elt in probe["streams"]:
@@ -149,12 +178,12 @@ def get_video_resolution(probe):
         if elt['codec_type'] != 'video':
             continue
         
-        return elt['width'], elt['height'], elt['r_frame_rate'], elt['codec_name']
+        return elt['width'], elt['height'], elt['r_frame_rate'], elt['codec_name'], elt['sample_aspect_ratio'].replace(':', '/')
         
     return 0, 0, 0
 
 def create_input_item(file, probe, has_video):
-    width, height, frame_rate, codec = get_video_resolution(probe)
+    width, height, frame_rate, codec, sar = get_video_resolution(probe)
     return {
                 'file': file,
                 'has_video': has_video,
@@ -164,6 +193,7 @@ def create_input_item(file, probe, has_video):
                 'height' : height,
                 'frame_rate' : frame_rate,
                 'video_codec' : codec,
+                'sar' : sar,
             }
     
 def main():
@@ -199,7 +229,7 @@ def main():
                 True
             ));
 
-            print(f"Process {input_files[0]['file']}")
+            print_step(f"Process {input_files[0]['file']}")
             input_files[0]['languages'] = extract_language_tracks(input_files[0]['file'], probe)
             audio_duration = get_max_audio_duration(probe)
             video_duration = get_video_duration(probe)
@@ -224,7 +254,7 @@ def main():
                             'metadata_title': suffix,
                             'join_chan' : languages[language]['channel']
                         }
-                        print(f"\t Add file {item['file']}")
+                        print_addingg_file(f"Adding file {item['file']}")
                         languages_missing.append(language)
                         input_files.append(item) 
 
@@ -240,11 +270,11 @@ def main():
             output_base_file = os.path.join(output_dir, f"{base_name}")
 
             if len(languages_in_ouput_file) == 0:
-                print (f"\t /!\ No language found: Specify languages in {input_files[0]['file']}.yml")
+                print_warning (f"No language found: Specify languages in {input_files[0]['file']}.yml")
                 sys.exit(1)
 
-            print (f"\t Language: {' '.join(languages_in_ouput_file)}")
-            print (f"\t Video padding: {extra_second}s")
+            print_desc (f"\t Language: {' '.join(languages_in_ouput_file)}")
+            print_desc (f"\t Video padding: {extra_second}s")
 
             # Créer un nouveau fichier vidéo avec les pistes audio et vidéo des fichiers d'entrée
             create_output_file(
@@ -280,7 +310,7 @@ def create_output_file(
                 video_codec = item['video_codec']
                 streams.append(ffmpeg.concat (
                     item['ffmpeg_input']['v'], 
-                     ffmpeg.input(f"color=c=black:s={item['width']}x{item['height']}:d={extra_second}:r={item['frame_rate']}", f='lavfi')
+                     ffmpeg.input(f"color=c=black:s={item['width']}x{item['height']}:d={extra_second}:r={item['frame_rate']}:sar={item['sar']}", f='lavfi')
                 ))
             else :
                 streams.append(item['ffmpeg_input']['v'])
@@ -302,7 +332,7 @@ def create_output_file(
 
         surround_map.append(f'{lang["track_idx"]}.FR-{lang["channel"]}')
                 
-    print (f"\t Video and Audio(s) Merging...")
+    print_substep (f"Video and Audio(s) Merging...")
             
         
     # 1 - Create one files with all audio tracks
@@ -314,10 +344,11 @@ def create_output_file(
         **metadata_langs
     )
 
-    ffmpeg_run(output_ffmpeg)
+    if not ffmpeg_run(output_ffmpeg):        
+        return False;
 
     # 2 - Create Sourrond track + title metadata
-    print (f"\t Surround track creating...")
+    print_substep (f"Surround track creating...")
     input_file = ffmpeg.input(output_file_tmp)
     # Create empty track
     surround_streams = []
@@ -356,7 +387,10 @@ def create_output_file(
         **metadata_titles
     )
 
-    ffmpeg_run(output_ffmpeg)
+    if not ffmpeg_run(output_ffmpeg):
+        os.remove(output_file_tmp)
+        return False;
+    
     os.remove(output_file_tmp)
 
     # Create one mov file for each lang
@@ -366,7 +400,7 @@ def create_output_file(
             continue
 
         # 2 - Create individual file
-        print (f"\t {lang['desc']} video generating...")
+        print_substep (f"{lang['desc']} video generating...")
 
         input_file = ffmpeg.input(output_file)
         suffix = lang['title']
@@ -381,7 +415,8 @@ def create_output_file(
             **{f'metadata:s:a:0': f"title='{lang['title']}'"},
         )
 
-        ffmpeg_run(output_ffmpeg)
+        if not ffmpeg_run(output_ffmpeg):
+            return False;
 
 if __name__ == "__main__":
     main()

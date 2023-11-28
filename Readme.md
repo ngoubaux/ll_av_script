@@ -1,7 +1,18 @@
 # Installation 
- - Install python 3
- - requirements
-   pip install -r requirements.txt
+Inside a terminal , execute this command.
+/bin/bash -c "$(curl -fsSL https://bitbucket.org/goubsi/ll_av_script/raw/main/bootstrap.sh)"
+
+This script will install:
+homebrew
+python3
+pip3
+git
+ffmpeg
+exiftool
+Python modules
+
+And fetch last version of the source in a new folder named ll_av_script if the bootstrap.sh script is not current from the ll_av_script folder.
+If the bootstrap.sh is called from the ll_av_script it will update the current folder and update python module requirements.
 
 # Usage 
 Copy files into the folder inputs
