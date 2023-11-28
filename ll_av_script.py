@@ -90,16 +90,16 @@ def extract_language_tracks(file, probe):
         if yml and yml[f'track_{audio_idx+1}'] and yml[f'track_{audio_idx+1}']['lang']: 
             lang = yml[f'track_{audio_idx+1}']['lang']
             md_lang =  languages[lang]['lang']
-            
-        if lang == "" and 'language' in elt['tags']:
-            md_lang = elt["tags"]['language']
-            lang = search_lang_by_md(md_lang)
 
         title_key = f"QuickTime:Track{elt['index']+1}Name"
         if lang == "" and title_key in metadata:
             lang = search_lang_by_title(metadata[title_key])
             md_lang =  languages[lang]['lang']
             
+        if lang == "" and 'language' in elt['tags']:
+            md_lang = elt["tags"]['language']
+            lang = search_lang_by_md(md_lang)
+
         if lang != "":
             language_tracks[lang] = {
                 'lang' : lang,
