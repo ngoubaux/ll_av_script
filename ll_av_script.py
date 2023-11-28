@@ -25,9 +25,9 @@ languages = {
     'E' : { 'name':'E', 'lang': 'eng', 'title' : 'E',   'channel': 'FL', 'track_idx': -1, 'desc': 'English', 'old_name': 'Eng'},
     'F' : { 'name':'F', 'lang': 'fra', 'title' : 'E_F', 'channel': 'FR', 'track_idx': -1, 'desc': 'French',  'old_name': 'Fre'},
     'G' : { 'name':'G', 'lang': 'ger', 'title' : 'E_G', 'channel': 'FC', 'track_idx': -1, 'desc': 'German',  'old_name': 'Ger'},
-    'S' : { 'name':'S', 'lang': 'spa', 'title' : 'E_S', 'channel': 'SL', 'track_idx': -1, 'desc': 'Spanish', 'old_name': 'Spa'}, 
-    'I' : { 'name':'I', 'lang': 'ita', 'title' : 'E_I', 'channel': 'SR', 'track_idx': -1, 'desc': 'Italian', 'old_name': 'Ita'},
-    'C' : { 'name':'C', 'lang': 'chi', 'title' : 'E_C', 'channel': 'BC', 'track_idx': -1, 'desc': 'Chinese', 'old_name': 'Chi'},
+    'S' : { 'name':'S', 'lang': 'spa', 'title' : 'E_S', 'channel': 'LFE', 'track_idx': -1, 'desc': 'Spanish', 'old_name': 'Spa'}, 
+    'I' : { 'name':'I', 'lang': 'ita', 'title' : 'E_I', 'channel': 'BL', 'track_idx': -1, 'desc': 'Italian', 'old_name': 'Ita'},
+    'C' : { 'name':'C', 'lang': 'chi', 'title' : 'E_C', 'channel': 'BR', 'track_idx': -1, 'desc': 'Chinese', 'old_name': 'Chi'},
 }
 
 def print_step(str):
@@ -86,14 +86,14 @@ def extract_language_tracks(file, probe):
         if elt['codec_type'] != 'audio':
             continue
 
-        if 'language' in elt['tags']:
-            md_lang = elt["tags"]['language']
-            lang = search_lang_by_md(md_lang)
-
         # Get Track language with Yml file
-        if lang == "" and yml and yml[f'track_{audio_idx+1}'] and yml[f'track_{audio_idx+1}']['lang']: 
+        if yml and yml[f'track_{audio_idx+1}'] and yml[f'track_{audio_idx+1}']['lang']: 
             lang = yml[f'track_{audio_idx+1}']['lang']
             md_lang =  languages[lang]['lang']
+            
+        if lang == "" and 'language' in elt['tags']:
+            md_lang = elt["tags"]['language']
+            lang = search_lang_by_md(md_lang)
 
         title_key = f"QuickTime:Track{elt['index']+1}Name"
         if lang == "" and title_key in metadata:
@@ -291,8 +291,8 @@ def create_output_file(
     languages_in_ouput_file,
     extra_second):
 
-    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su.mov"
-    fd, output_file_tmp = tempfile.mkstemp(dir=os.path.dirname(output_file), suffix = '.mov')
+    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su.mp4"
+    fd, output_file_tmp = tempfile.mkstemp(dir=os.path.dirname(output_file), suffix = '.mp4')
     # Load all input files 
     # Add Video & Audio Stream 
     # Create metadata
@@ -339,8 +339,9 @@ def create_output_file(
     output_ffmpeg = ffmpeg.output(
         *streams, 
         output_file_tmp, 
-        vcodec=video_codec, 
+        vcodec='libx264', 
         acodec='copy', 
+        pix_fmt='yuv420p',
         **metadata_langs
     )
 
@@ -374,7 +375,7 @@ def create_output_file(
         'join', 
         #'amerge',
         inputs='6', 
-        channel_layout='6.0', 
+        channel_layout='5.1', 
         map='|'.join(surround_map)
     )
     # Create the final command
@@ -382,7 +383,7 @@ def create_output_file(
         input_file,
         surround_input,
         output_file,
-        vcodec='copy', 
+        vcodec='copy',
          **{f'metadata:s:a:{len(metadata_titles)}': f"title='{'_'.join(languages_in_ouput_file)}'"},
         **metadata_titles
     )
@@ -404,7 +405,7 @@ def create_output_file(
 
         input_file = ffmpeg.input(output_file)
         suffix = lang['title']
-        output_single_file = f"{output_base_file}_{suffix}.mov"
+        output_single_file = f"{output_base_file}_{suffix}.mp4"
         # Create the final command
         output_ffmpeg = ffmpeg.output(
             input_file.video,
