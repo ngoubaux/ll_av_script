@@ -33,15 +33,9 @@ PACKAGES=(
 	git
 	cask
 	curl
-	graphviz
-	pipenv
 	python3
-	pyenv
-	pyenv-virtualenv
-	wget
 	ffmpeg
     exiftool
-    vlc
 )
 
 echo_ok "Installing packages..."
@@ -55,7 +49,34 @@ PYTHON_PACKAGES=(
 	ffmpeg-python
     PyYAML
     pyexiftool
+	colorama
 )
 python3 -m pip install "${PYTHON_PACKAGES[@]}"
 
-echo_ok "Bootstrapping complete"
+project_name="ll_av_script"
+project_folder=""
+echo_ok "Fetching last version of the ${project_name} ..."
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+
+  	git clone https://goubsi@bitbucket.org/goubsi/ll_av_script.git ${project_name} --depth 1
+	cd ${project_name}
+
+else
+	git pull -f --rebase 
+fi
+
+project_folder="$(pwd)"
+
+echo_ok "Setting up ${project_name} env ..."
+if [ ! -d "inputs" ]; then 	
+	mkdir inputs
+fi
+if [ ! -d "outputs" ]; then 	
+	mkdir outputs
+fi
+python3 -m pip install -r requirements.txt
+chmod +x ll_av_script.py
+
+echo_ok "Bootstrapping ${project_name} complete"
+echo_ok "Script is installed in ${project_folder}"
+echo_ok "You can executed by this command: cd ${project_folder}; ./ll_av_script.py"
