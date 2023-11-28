@@ -291,7 +291,7 @@ def create_output_file(
     languages_in_ouput_file,
     extra_second):
 
-    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_6.0.mov"
+    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su.mov"
     fd, output_file_tmp = tempfile.mkstemp(dir=os.path.dirname(output_file), suffix = '.mov')
     # Load all input files 
     # Add Video & Audio Stream 
