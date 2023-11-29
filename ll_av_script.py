@@ -42,7 +42,7 @@ def print_error(str):
     print(Fore.RED+Style.BRIGHT+'X'+Style.NORMAL+Fore.RED+' Error: '+ Style.RESET_ALL+'Please watch log message behove...')
     
 def print_warning(str):
-    print(Fore.YELLOW+Style.BRIGHT+'<!>'+Style.NORMAL+Fore.YELLOW+' Error: ' + Style.RESET_ALL+str)
+    print(Fore.YELLOW+Style.BRIGHT+'<!>'+Style.NORMAL+Fore.YELLOW+' Warning: ' + Style.RESET_ALL+str)
     
 def print_desc(str):
     print(Style.DIM+str+Style.RESET_ALL)
@@ -83,7 +83,7 @@ def extract_language_tracks(file, probe):
         lang = ""
 
         # Get Track language with Metadata
-        if elt['codec_type'] != 'audio':
+        if elt['codec_type'] != 'audio' or elt['channels'] > 2:
             continue
 
         # Get Track language with Yml file
@@ -93,8 +93,10 @@ def extract_language_tracks(file, probe):
 
         title_key = f"QuickTime:Track{elt['index']+1}Name"
         if lang == "" and title_key in metadata:
-            lang = search_lang_by_title(metadata[title_key])
-            md_lang =  languages[lang]['lang']
+            key_name = metadata[title_key].replace('\'', '')
+            lang = search_lang_by_title(key_name)
+            if lang != '':
+                md_lang =  languages[lang]['lang']
             
         if lang == "" and 'language' in elt['tags']:
             md_lang = elt["tags"]['language']
@@ -216,7 +218,7 @@ def main():
         if extension == buddle_extensions or extension == video_extensions:
             # Extract basename + Language
             if extension == buddle_extensions:
-                pattern = "(\w*?)((_["+"".join(list(languages.keys()))+f"])+)(_6\.0)?{extension}"
+                pattern = "(\w*?)((_["+"".join(list(languages.keys()))+f"])+)(_Su)?{extension}"
                 matches   = re.match(pattern, file)
                 if not matches:
                     return
