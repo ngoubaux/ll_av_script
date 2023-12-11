@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import textwrap
 import ffmpeg
 import re
 import os
@@ -8,10 +9,13 @@ import yaml
 import tempfile
 import exiftool
 import sys
+import argparse
 from colorama import Fore, Back, Style, init as colorama_init
 import subprocess
 
 colorama_init()
+
+prog_version="1.0.3"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -350,10 +354,39 @@ def create_input_item(file, probe, has_video):
 
 
 def main():
+    global quiet_output
     # Chemin du dossier contenant les fichiers d'entrée
     input_dir = "inputs"
     output_dir = "outputs"
 
+    # lang_keys = "   ".join(languages.keys());
+    lang_keys = " ".join('{0: <5}'.format(o["name"].replace('_', '-')) for o in languages.values())
+    lang_channel = " ".join('{0: <5}'.format(o["channel"]) for o in languages.values())
+    lang_count = " ".join('{0: <5}'.format(i) for i in range(1, 9))
+    # lang_channel = "  ".join(o["channel"] for o in languages.values())
+    
+    parser = argparse.ArgumentParser(
+        prog="ll_av_script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent(f'''\
+        Audio / Video Mixer
+        --------------------
+            Merge Audio and video file to one single file.
+            Then create a Surround ({channel_layout}) track with all languages
+            
+            Layout
+            ------
+            {lang_count}
+            {lang_keys}
+            {lang_channel}
+                    
+        '''))    
+    parser.add_argument("-v", "--verbose", help="Make output more verbose", action="store_false")
+    parser.add_argument('--version', action='version', version=f"%(prog)s: {prog_version}")
+    args = parser.parse_args()
+    quiet_output = args.verbose
+    
+         
     # Parcourir le dossier d'entrée
     for file in os.listdir(input_dir):
         base_name, extension = os.path.splitext(file)
