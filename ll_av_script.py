@@ -9,10 +9,18 @@ import tempfile
 import exiftool
 import sys
 from colorama import Fore, Back, Style, init as colorama_init
+import subprocess
 
 colorama_init()
 
-quiet_output = True
+# Liste des extensions de fichiers vidéo et audio
+buddle_extensions = ".mov"
+video_extensions = ".mp4"
+audio_extensions = ".m4a"
+output_extensions = ".mp4"
+
+
+quiet_output = False
 # Liste des langues
 # FFMPEG is using ISO 639-2 language table
 # https://en.wikipedia.org/wiki/List_of_ISO_639-2_codes
@@ -21,6 +29,7 @@ quiet_output = True
 # http://underpop.online.fr/f/ffmpeg/help/channel-layout.htm.gz
 # https://trac.ffmpeg.org/wiki/AudioChannelManipulation
 #
+channel_layout="7.1"
 languages = {
     "E": {
         "name": "E",
@@ -49,11 +58,20 @@ languages = {
         "desc": "German",
         "old_name": "Ger",
     },
+    "-": {
+        "name": "-",
+        "lang": "und",
+        "title": "und",
+        "channel": "LFE",
+        "track_idx": -1,
+        "desc": "Unused",
+        "old_name": "und",
+    },
     "S": {
         "name": "S",
         "lang": "spa",
         "title": "E_S",
-        "channel": "LFE",
+        "channel": "BL",
         "track_idx": -1,
         "desc": "Spanish",
         "old_name": "Spa",
@@ -62,7 +80,7 @@ languages = {
         "name": "I",
         "lang": "ita",
         "title": "E_I",
-        "channel": "BL",
+        "channel": "BR",
         "track_idx": -1,
         "desc": "Italian",
         "old_name": "Ita",
@@ -71,10 +89,19 @@ languages = {
         "name": "C",
         "lang": "chi",
         "title": "E_C",
-        "channel": "BR",
+        "channel": "SL",
         "track_idx": -1,
         "desc": "Chinese",
         "old_name": "Chi",
+    },
+    "_": {
+        "name": "-",
+        "lang": "und",
+        "title": "und",
+        "channel": "SR",
+        "track_idx": -1,
+        "desc": "Unused",
+        "old_name": "und",
     },
 }
 
@@ -240,15 +267,50 @@ def get_video_duration(probe):
     return duration
 
 
-def ffmpeg_run(output_ffmpeg, force_args=0):
-    output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
+def ffmpeg_run_cmdline_async(
+    args
+):    
+    stdin_stream = None
+    stdout_stream = None
+    stderr_stream = subprocess.PIPE
+    if quiet_output:
+        stderr_stream = subprocess.STDOUT
+        stdout_stream = subprocess.DEVNULL
+    return subprocess.Popen(
+        args,
+        stdin=stdin_stream,
+        stdout=stdout_stream,
+        stderr=stderr_stream,
+        cwd=None,
+    )
+    
+def ffmpeg_run_cmdline(    
+    cmdline    
+):
+    
+    process = ffmpeg_run_cmdline_async(
+       cmdline
+    )
+    out, err = process.communicate(input)
+    retcode = process.poll()
+    if retcode:
+        raise ffmpeg.Error('ffmpeg', out, err)
+    return out, err
 
+def ffmpeg_run(output_ffmpeg, force_args=0):
+    # output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
+
+    # output_ffmpeg.get_args()
+    _args = ffmpeg.compile(output_ffmpeg, overwrite_output=True)
+    
+    args = [arg.replace('\\\\\\\\\\\\=', '=') for arg in _args]
+    
     if not quiet_output or force_args:
-        print(output_ffmpeg.get_args())
+        print(args)
         # print(ffmpeg.compile(output_ffmpeg))
 
     try:
-        out, err = ffmpeg.run(output_ffmpeg, quiet=quiet_output, capture_stderr=True)
+        out, err = ffmpeg_run_cmdline(args)
     except ffmpeg.Error as e:
         print_error(e.stderr.decode("utf-8"))
         return False
@@ -291,11 +353,6 @@ def main():
     # Chemin du dossier contenant les fichiers d'entrée
     input_dir = "inputs"
     output_dir = "outputs"
-
-    # Liste des extensions de fichiers vidéo et audio
-    buddle_extensions = ".mov"
-    video_extensions = ".mp4"
-    audio_extensions = ".m4a"
 
     # Parcourir le dossier d'entrée
     for file in os.listdir(input_dir):
@@ -482,7 +539,7 @@ def create_output_file_merge_files(
                         ],
                     ),
                     "pan",
-                    "stereo|c0<c0|c1<c0",
+                    "stereo|c0=2*c0|c1=2*c0",
                 )
             )
             languages["E"]["track_idx"] = 0
@@ -550,10 +607,12 @@ def create_output_file_create_surround_track(
             surround_streams[3],
             surround_streams[4],
             surround_streams[5],
+            surround_streams[6],
+            surround_streams[7],
         ),
         "join",
-        inputs="6",
-        channel_layout="5.1",
+        inputs=f"{len(languages)}",
+        channel_layout=channel_layout,
         map="|".join(surround_map),
     )
     # Create the final command
@@ -591,7 +650,7 @@ def create_output_file_create_individual_language(
 
         input_file = ffmpeg.input(input_filename)
         suffix = lang["title"]
-        output_single_file = f"{output_base_file}_{suffix}.mp4"
+        output_single_file = f"{output_base_file}_{suffix}{output_extensions}"
         # Create the final command
         output_ffmpeg = ffmpeg.output(
             input_file.video,
@@ -620,9 +679,9 @@ def create_output_file(
     extra_second,
     extract_english,
 ):
-    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su.mp4"
+    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su{output_extensions}"
     fd, output_file_tmp = tempfile.mkstemp(
-        dir=os.path.dirname(output_file), suffix=".mp4"
+        dir=os.path.dirname(output_file), suffix=output_extensions
     )
 
     if not create_output_file_merge_files(
