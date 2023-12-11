@@ -20,7 +20,7 @@ audio_extensions = ".m4a"
 output_extensions = ".mp4"
 
 
-quiet_output = False
+quiet_output = True
 # Liste des langues
 # FFMPEG is using ISO 639-2 language table
 # https://en.wikipedia.org/wiki/List_of_ISO_639-2_codes
