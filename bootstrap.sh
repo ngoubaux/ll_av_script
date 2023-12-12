@@ -56,6 +56,18 @@ python3 -m pip install "${PYTHON_PACKAGES[@]}"
 project_name="ll_av_script"
 project_folder=""
 echo_ok "Fetching last version of the ${project_name} ..."
+if [ -x $project_name ]; then
+	if ! git -C ${project_name} rev-parse --git-dir > /dev/null 2>&1; then
+		backup_name="$(mktemp -d ll_av_script.XXXX)"
+		echo_ok "Backup existing ${project_name} folder to ${backup_name}..."
+		mv "${project_name}" "${backup_name}"
+	else 
+		echo_ok "Using a previous ${project_name} folder..."
+		cd ${project_name}
+	fi
+fi
+		
+
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
 
   	git clone https://goubsi@bitbucket.org/goubsi/ll_av_script.git ${project_name} --depth 1
