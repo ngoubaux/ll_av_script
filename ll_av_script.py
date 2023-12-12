@@ -417,26 +417,28 @@ def main():
 
             # Rechercher les fichiers audio manquants
             for language in languages:
-                if language not in input_files[0]["languages"].keys():
-                    suffix = language
-                    if suffix != "E":
-                        suffix = f"E_{suffix}"
-                    filename = f"{base_name}_{suffix}{audio_extensions}"
-                    input_file = os.path.join(input_dir, filename)
+                suffix = language
+                if suffix != "E":
+                    suffix = f"E_{suffix}"
+                filename = f"{base_name}_{suffix}{audio_extensions}"
+                input_file = os.path.join(input_dir, filename)
 
-                    if os.path.exists(input_file):
-                        probe = ffmpeg.probe(input_file)
-                        audio_duration = get_max_audio_duration(probe, audio_duration)
-                        item = create_input_item(input_file, probe, False)
-                        item["languages"][language] = {
-                            "lang": language,
-                            "audio_idx": 0,
-                            "metadata_lang": languages[language]["lang"],
-                            "metadata_title": suffix,
-                            "join_chan": languages[language]["channel"],
-                        }
-                        print_addingg_file(f"Adding file {item['file']}")
-                        input_files.append(item)
+                if os.path.exists(input_file):
+                    probe = ffmpeg.probe(input_file)
+                    audio_duration = get_max_audio_duration(probe, audio_duration)
+                    item = create_input_item(input_file, probe, False)
+                    item["languages"][language] = {
+                        "lang": language,
+                        "audio_idx": 0,
+                        "metadata_lang": languages[language]["lang"],
+                        "metadata_title": suffix,
+                        "join_chan": languages[language]["channel"],
+                    }
+                    print_addingg_file(f"Adding file {item['file']}")
+                    input_files.append(item)
+                    # Remove lang from the master file                    
+                    if language in input_files[0]["languages"].keys():
+                        del input_files[0]["languages"][language]
 
             extra_second = 0
             if video_duration < audio_duration:
@@ -691,7 +693,8 @@ def create_output_file_create_individual_language(
             output_single_file,
             vcodec="copy",
             acodec="copy",
-            **{f"metadata:s:a:0": f"title='{lang['title']}'"},
+            **{f"metadata:s:a:0": f"title='{lang['title']}'",
+            "disposition:a":  "+default",},
         )
 
         if not ffmpeg_run(output_ffmpeg):
