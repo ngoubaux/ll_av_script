@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.3"
+prog_version="1.0.4"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
