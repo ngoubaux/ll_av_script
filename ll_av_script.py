@@ -98,7 +98,7 @@ languages = {
         "desc": "Chinese",
         "old_name": "Chi",
     },
-    "_": {
+    "$": {
         "name": "-",
         "lang": "und",
         "title": "und",
@@ -395,13 +395,14 @@ def main():
         if extension == buddle_extensions or extension == video_extensions:
             # Extract basename + Language
             pattern = (
-                "(\w*?)((_["
+                "((_["
                 + "".join(list(languages.keys()))
-                + f"])+)(_Su)?{extension}"
+                + "])(?![0-9A-Za-z]))+"
             )
-            matches = re.match(pattern, file)
+            matches = re.search(pattern, file)
             if matches:
-                base_name = matches.group(1)
+                pos = matches.start()
+                base_name = file[0:pos]
 
             probe = ffmpeg.probe(os.path.join(input_dir, file))
             input_files.append(
@@ -457,9 +458,10 @@ def main():
                 )
                 sys.exit(1)
 
+            print_desc(f"\t Name: {base_name}")
             print_desc(f"\t Language: {' '.join(languages_in_ouput_file)}")
             print_desc(f"\t Video padding: {extra_second}s")
-
+            
             extract_english = False
             if not "E" in languages_in_ouput_file:
                 languages_in_ouput_file.insert(0, "E")
