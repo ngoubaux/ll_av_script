@@ -428,9 +428,13 @@ def cut_file(file, time_start, time_end):
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
 
-
     filename = os.path.basename(file)
     output_base_file = os.path.join(output_dir, f"{filename}")
+
+    print_step(f"Process {filename}")
+    print_step(f"Simple Editing")
+    print_desc(f"\t Start time: {time_start}")
+    print_desc(f"\t End time: {time_end}")
 
     input_file = ffmpeg.input(file)
     output_file = ffmpeg.output(input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'), output_base_file)
