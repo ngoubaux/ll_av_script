@@ -397,11 +397,10 @@ def main():
     ##
     #    Cutting the file and exit
     ##
-    if 'start_time' in args or 'end_time' in args:
-        if 'start_time' not in args or 'end_time' not in args or  'filename' not in args:
+    if args.start_time is not None or args.end_time is not None:
+        if args.start_time is None or args.end_time is None or 'filename' is not None:
             print_error("You must specify all argument: --start, --to, --file")
             sys.exit(1)
-
         cut_file(args.filename, args.start_time, args.end_time)
         sys.exit(0)
 
