@@ -15,16 +15,19 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.5"
+prog_version="1.0.6"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
 video_extensions = ".mp4"
 audio_extensions = ".m4a"
 output_extensions = ".mp4"
+output_aif_extensions = ".aif"
 
 
 quiet_output = True
+extract_aif = False
+only_extract_aif = False
 # Path to outputs folder
 output_dir = "outputs"
 
@@ -355,6 +358,9 @@ def create_input_item(file, probe, has_video):
 def main():
     global quiet_output
     global output_dir
+    global extract_aif
+    global only_extract_aif
+
     # Chemin du dossier contenant les fichiers d'entrée
     input_dir = "inputs"
 
@@ -390,10 +396,13 @@ def main():
     parser.add_argument('--version', action='version', version=f"%(prog)s: {prog_version}")
     parser.add_argument("-ss", "--start", help="Cut the video from this time", dest="start_time", action='store')
     parser.add_argument("-to", "--to", help="Cut the video until this time", dest="end_time", action='store')
-    parser.add_argument("-f", "--file", help="Use this file", dest="filename", action='store')
+    parser.add_argument("-f", "--file", help="Process this file", dest="filename", action='store')
+    parser.add_argument("-aif", "--extra-audio-aif", help="Extra mono aif audio for each language", dest="extract_aif", action='store_true')
+    #parser.add_argument("-aif-only", "--extract-only-audio-aif", help="Extra only mono aif audio for each language", dest="only_extract_aif", action='store_true')
     args = parser.parse_args()
     quiet_output = args.verbose
-
+    extract_aif = args.extract_aif
+    #only_extract_aif = args.only_extract_aif
     ##
     #    Cutting the file and exit
     ##
@@ -415,6 +424,7 @@ def main():
         # Parcourir le dossier d'entrée
         for file in os.listdir(input_dir):
             process_file(file, input_dir)
+
 
 def cut_file(file, time_start, time_end):
     '''
@@ -764,10 +774,38 @@ def create_output_file_create_individual_language(
 
     return True
 
-    # end def
 
-    """_summary_
+def create_output_file_create_individual_aif_language(
+    input_filename, output_base_file, languages_in_ouput_file
+):
     """
+    Purpose: arg
+    """
+    # Create one mov file for each lang
+    for lang in languages.values():
+        # No translation to export
+        if lang['name'] not in languages_in_ouput_file:
+            continue
+
+        # 2 - Create individual file
+        print_substep(f"{lang['desc']} aif audio generating...")
+
+        input_file = ffmpeg.input(input_filename)
+        suffix = lang["name"]
+        output_single_file = f"{output_base_file}_{suffix}{output_aif_extensions}"
+        # Create the final command
+        output_ffmpeg = ffmpeg.output(
+            ffmpeg.filter(
+                    input_file[f"a:{lang['track_idx']}"],
+                    "pan",
+                    "mono|c0=c1"),
+            output_single_file,
+        )
+
+        if not ffmpeg_run(output_ffmpeg):
+            return False
+
+    return True
 
 
 def create_output_file(
@@ -777,12 +815,23 @@ def create_output_file(
     extra_second,
     extract_english,
 ):
+    global extract_aif
+    global only_extract_aif
+
     output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su{output_extensions}"
     fd, output_file_tmp = tempfile.mkstemp(
         dir=os.path.dirname(output_file), suffix=output_extensions
     )
 
+    if only_extract_aif:
+       create_output_file_create_individual_aif_language(
+            input_files[0]["file"], output_base_file, languages_in_ouput_file
+        )
+       return
+
     if not create_output_file_merge_files(
+        # The above code is not doing anything. It is just a list of words "input_files" followed by
+        # three hash symbols "
         input_files, output_file_tmp, extra_second, extract_english
     ):
         os.remove(output_file_tmp)
@@ -798,6 +847,11 @@ def create_output_file(
     create_output_file_create_individual_language(
         output_file, output_base_file, languages_in_ouput_file
     )
+
+    if extract_aif:
+        create_output_file_create_individual_aif_language(
+            output_file, output_base_file, languages_in_ouput_file
+        )
 
 
 if __name__ == "__main__":
