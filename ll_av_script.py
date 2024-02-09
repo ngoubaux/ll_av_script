@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.4"
+prog_version="1.0.5"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -25,6 +25,9 @@ output_extensions = ".mp4"
 
 
 quiet_output = True
+# Path to outputs folder
+output_dir = "outputs"
+
 # Liste des langues
 # FFMPEG is using ISO 639-2 language table
 # https://en.wikipedia.org/wiki/List_of_ISO_639-2_codes
@@ -127,18 +130,7 @@ def print_error(str):
         + Fore.RED
         + " Error: "
         + Style.RESET_ALL
-        + "Extracting ffmpeg error output..."
-    )
-    print(str)
-    print(
-        Fore.RED
-        + Style.BRIGHT
-        + "X"
-        + Style.NORMAL
-        + Fore.RED
-        + " Error: "
-        + Style.RESET_ALL
-        + "Please watch log message behove..."
+        + str
     )
 
 
@@ -226,7 +218,8 @@ def extract_language_tracks(file, probe):
                 "join_chan": languages[lang]["channel"],
             }
         else:
-            print_warning(f"Audio track_{audio_idx} is skipped")
+            print_warning(f"No mapped language found for Audio track_{audio_idx}")
+            print_warning(f"   => Please add either a tag, a QuickTime setting or yml config file")
 
         audio_idx += 1
 
@@ -273,7 +266,7 @@ def get_video_duration(probe):
 
 def ffmpeg_run_cmdline_async(
     args
-):    
+):
     stdin_stream = None
     stdout_stream = None
     stderr_stream = subprocess.PIPE
@@ -287,11 +280,9 @@ def ffmpeg_run_cmdline_async(
         stderr=stderr_stream,
         cwd=None,
     )
-    
-def ffmpeg_run_cmdline(    
-    cmdline    
-):
-    
+
+def ffmpeg_run_cmdline(cmdline):
+
     process = ffmpeg_run_cmdline_async(
        cmdline
     )
@@ -302,24 +293,32 @@ def ffmpeg_run_cmdline(
     return out, err
 
 def ffmpeg_run(output_ffmpeg, force_args=0):
+    global quiet_output
     # output_ffmpeg = ffmpeg.overwrite_output(output_ffmpeg)
 
     # output_ffmpeg.get_args()
     _args = ffmpeg.compile(output_ffmpeg, overwrite_output=True)
-    
+
+
     args = [arg.replace('\\\\\\\\\\\\=', '=') for arg in _args]
-    
+
     if not quiet_output or force_args:
         print(args)
         # print(ffmpeg.compile(output_ffmpeg))
 
     try:
         out, err = ffmpeg_run_cmdline(args)
+        if not quiet_output:
+            print(out);
     except ffmpeg.Error as e:
         print_error(e.stderr.decode("utf-8"))
         return False
     return True
 
+def get_sec(time_str):
+    """Get seconds from time."""
+    h, m, s = time_str.split(':')
+    return int(h) * 3600 + int(m) * 60 + int(s)
 
 def get_video_resolution(probe):
     for elt in probe["streams"]:
@@ -355,16 +354,22 @@ def create_input_item(file, probe, has_video):
 
 def main():
     global quiet_output
+    global output_dir
     # Chemin du dossier contenant les fichiers d'entrée
     input_dir = "inputs"
-    output_dir = "outputs"
+
+    if not os.path.exists(input_dir):
+        os.mkdir(input_dir)
+
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
 
     # lang_keys = "   ".join(languages.keys());
     lang_keys = " ".join('{0: <5}'.format(o["name"].replace('_', '-')) for o in languages.values())
     lang_channel = " ".join('{0: <5}'.format(o["channel"]) for o in languages.values())
     lang_count = " ".join('{0: <5}'.format(i) for i in range(1, 9))
     # lang_channel = "  ".join(o["channel"] for o in languages.values())
-    
+
     parser = argparse.ArgumentParser(
         prog="ll_av_script",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -373,108 +378,160 @@ def main():
         --------------------
             Merge Audio and video file to one single file.
             Then create a Surround ({channel_layout}) track with all languages
-            
+
             Layout
             ------
             {lang_count}
             {lang_keys}
             {lang_channel}
-                    
-        '''))    
+
+        '''))
     parser.add_argument("-v", "--verbose", help="Make output more verbose", action="store_false")
     parser.add_argument('--version', action='version', version=f"%(prog)s: {prog_version}")
+    parser.add_argument("-ss", "--start", help="Cut the video from this time", dest="start_time", action='store')
+    parser.add_argument("-to", "--to", help="Cut the video until this time", dest="end_time", action='store')
+    parser.add_argument("-f", "--file", help="Use this file", dest="filename", action='store')
     args = parser.parse_args()
     quiet_output = args.verbose
-    
-         
-    # Parcourir le dossier d'entrée
-    for file in os.listdir(input_dir):
-        base_name, extension = os.path.splitext(file)
-        input_files = []
 
-        if extension == buddle_extensions or extension == video_extensions:
-            # Extract basename + Language
-            pattern = (
-                "((_["
-                + "".join(list(languages.keys()))
-                + "])(?![0-9A-Za-z]))+"
+    ##
+    #    Cutting the file and exit
+    ##
+    if 'start_time' in args or 'end_time' in args:
+        if 'start_time' not in args or 'end_time' not in args or  'filename' not in args:
+            print_error("You must specify all argument: --start, --to, --file")
+            sys.exit(1)
+
+        cut_file(args.filename, args.start_time, args.end_time)
+        sys.exit(0)
+
+    ##
+    # Full workflow
+    ##
+    if 'filename' in args:
+        dirname = os.path.dirname(args.filename)
+        filename = os.path.basename(args.filename)
+        process_file(filename, dirname)
+    else:
+        # Parcourir le dossier d'entrée
+        for file in os.listdir(input_dir):
+            process_file(file, input_dir)
+
+def cut_file(file, time_start, time_end):
+    '''
+        Cut the file between from start to end
+    '''
+    global quiet_output
+    # Path to outputs folder
+    global output_dir
+
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+
+    filename = os.path.basename(file)
+    output_base_file = os.path.join(output_dir, f"{filename}")
+
+    input_file = ffmpeg.input(file)
+    output_file = ffmpeg.output(input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'), output_base_file)
+    ffmpeg_run(output_file)
+
+
+
+def process_file(file, input_dir):
+    '''
+        Process the full workflow (Merge audio, Extract Audio, Update metadata, create Surround)
+    '''
+    global quiet_output
+    global output_dir
+
+
+    base_name, extension = os.path.splitext(file)
+    input_files = []
+
+    if extension == buddle_extensions or extension == video_extensions:
+        # Extract basename + Language
+        pattern = (
+            "((_["
+            + "".join(list(languages.keys()))
+            + "])(?![0-9A-Za-z]))+"
+        )
+        matches = re.search(pattern, file)
+        if matches:
+            pos = matches.start()
+            base_name = file[0:pos]
+
+        probe = ffmpeg.probe(os.path.join(input_dir, file))
+        input_files.append(
+            create_input_item(os.path.join(input_dir, file), probe, True)
+        )
+
+        print_step(f"Process {input_files[0]['file']}")
+        input_files[0]["languages"] = extract_language_tracks(
+            input_files[0]["file"], probe
+        )
+        audio_duration = get_max_audio_duration(probe)
+        video_duration = get_video_duration(probe)
+
+        # Rechercher les fichiers audio manquants
+        for language in languages:
+            suffix = language
+            if suffix != "E":
+                suffix = f"E_{suffix}"
+            filename = f"{base_name}_{suffix}{audio_extensions}"
+            input_file = os.path.join(input_dir, filename)
+
+            if os.path.exists(input_file):
+                probe = ffmpeg.probe(input_file)
+                audio_duration = get_max_audio_duration(probe, audio_duration)
+                item = create_input_item(input_file, probe, False)
+                item["languages"][language] = {
+                    "lang": language,
+                    "audio_idx": 0,
+                    "metadata_lang": languages[language]["lang"],
+                    "metadata_title": suffix,
+                    "join_chan": languages[language]["channel"],
+                }
+                print_addingg_file(f"Adding file {item['file']}")
+                input_files.append(item)
+                # Remove lang from the master file
+                if language in input_files[0]["languages"].keys():
+                    del input_files[0]["languages"][language]
+
+        extra_second = 0
+        if video_duration < audio_duration:
+            extra_second = audio_duration - video_duration
+
+        # Construct output filename
+        languages_in_ouput_file = []
+        for item in input_files:
+            languages_in_ouput_file += item["languages"].keys()
+
+        output_base_file = os.path.join(output_dir, f"{base_name}")
+
+        if len(languages_in_ouput_file) == 0:
+            print_warning(
+                f"No language found: Specify languages in {input_files[0]['file']}.yml"
             )
-            matches = re.search(pattern, file)
-            if matches:
-                pos = matches.start()
-                base_name = file[0:pos]
+            sys.exit(1)
 
-            probe = ffmpeg.probe(os.path.join(input_dir, file))
-            input_files.append(
-                create_input_item(os.path.join(input_dir, file), probe, True)
-            )
+        print_desc(f"\t Name: {base_name}")
+        print_desc(f"\t Language: {' '.join(languages_in_ouput_file)}")
+        print_desc(f"\t Video padding: {extra_second}s")
 
-            print_step(f"Process {input_files[0]['file']}")
-            input_files[0]["languages"] = extract_language_tracks(
-                input_files[0]["file"], probe
-            )
-            audio_duration = get_max_audio_duration(probe)
-            video_duration = get_video_duration(probe)
+        extract_english = False
+        if not "E" in languages_in_ouput_file:
+            languages_in_ouput_file.insert(0, "E")
+            extract_english = True
 
-            # Rechercher les fichiers audio manquants
-            for language in languages:
-                suffix = language
-                if suffix != "E":
-                    suffix = f"E_{suffix}"
-                filename = f"{base_name}_{suffix}{audio_extensions}"
-                input_file = os.path.join(input_dir, filename)
-
-                if os.path.exists(input_file):
-                    probe = ffmpeg.probe(input_file)
-                    audio_duration = get_max_audio_duration(probe, audio_duration)
-                    item = create_input_item(input_file, probe, False)
-                    item["languages"][language] = {
-                        "lang": language,
-                        "audio_idx": 0,
-                        "metadata_lang": languages[language]["lang"],
-                        "metadata_title": suffix,
-                        "join_chan": languages[language]["channel"],
-                    }
-                    print_addingg_file(f"Adding file {item['file']}")
-                    input_files.append(item)
-                    # Remove lang from the master file                    
-                    if language in input_files[0]["languages"].keys():
-                        del input_files[0]["languages"][language]
-
-            extra_second = 0
-            if video_duration < audio_duration:
-                extra_second = audio_duration - video_duration
-
-            # Construct output filename
-            languages_in_ouput_file = []
-            for item in input_files:
-                languages_in_ouput_file += item["languages"].keys()
-
-            output_base_file = os.path.join(output_dir, f"{base_name}")
-
-            if len(languages_in_ouput_file) == 0:
-                print_warning(
-                    f"No language found: Specify languages in {input_files[0]['file']}.yml"
-                )
-                sys.exit(1)
-
-            print_desc(f"\t Name: {base_name}")
-            print_desc(f"\t Language: {' '.join(languages_in_ouput_file)}")
-            print_desc(f"\t Video padding: {extra_second}s")
-            
-            extract_english = False
-            if not "E" in languages_in_ouput_file:
-                languages_in_ouput_file.insert(0, "E")
-                extract_english = True
-
-            # Créer un nouveau fichier vidéo avec les pistes audio et vidéo des fichiers d'entrée
-            create_output_file(
-                input_files,
-                output_base_file,
-                languages_in_ouput_file,
-                extra_second,
-                extract_english,
-            )
+        # Créer un nouveau fichier vidéo avec les pistes audio et vidéo des fichiers d'entrée
+        create_output_file(
+            input_files,
+            output_base_file,
+            languages_in_ouput_file,
+            extra_second,
+            extract_english,
+        )
 
 
 def get_lang_metadata(input_files):
