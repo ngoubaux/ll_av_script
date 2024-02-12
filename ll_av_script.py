@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.6"
+prog_version="1.0.7"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -30,6 +30,7 @@ extract_aif = False
 only_extract_aif = False
 # Path to outputs folder
 output_dir = "outputs"
+no_interact = False
 
 # Liste des langues
 # FFMPEG is using ISO 639-2 language table
@@ -180,9 +181,14 @@ def extract_language_tracks(file, probe):
     # Open Config file if present
     yml = None
     yml_path = f"{file}.yml"
-    if os.path.isfile(yml_path):
-        if stream := open(yml_path):
-            yml = yaml.safe_load(stream)
+
+    try:
+        if os.path.isfile(yml_path):
+            if stream := open(yml_path):
+                yml = yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+        print_warning(f"Error while parsing YAML file: {yml_path}")
+
 
     with exiftool.ExifToolHelper() as et:
         metadata = et.get_metadata(file)[0]
@@ -191,6 +197,8 @@ def extract_language_tracks(file, probe):
     audio_idx = 0
     for elt in probe["streams"]:
         lang = ""
+        key_name = ""
+        md_lang = ""
 
         # Get Track language with Metadata
         if elt["codec_type"] != "audio" or elt["channels"] > 2:
@@ -223,6 +231,13 @@ def extract_language_tracks(file, probe):
         else:
             print_warning(f"No mapped language found for Audio track_{audio_idx}")
             print_warning(f"   => Please add either a tag, a QuickTime setting or yml config file")
+            print_warning(f"   => currrent tag: {md_lang}")
+            print_warning(f"   => currrent QuickTime desc: {key_name}")
+            if not no_interact:
+                ask = input('Do you want to create the audio track description file ? (Y/n)\n')
+                if ask.lower() == "y" or ask == "":
+                    with open(yml_path, "a") as yml_file:
+                        yml_file.write(f"\n#tag: {md_lang}, QuickTime desc: {key_name}\ntrack_{audio_idx}:\n\tlang: ")
 
         audio_idx += 1
 
@@ -360,6 +375,7 @@ def main():
     global output_dir
     global extract_aif
     global only_extract_aif
+    global no_interact
 
     # Chemin du dossier contenant les fichiers d'entrée
     input_dir = "inputs"
@@ -398,10 +414,12 @@ def main():
     parser.add_argument("-to", "--to", help="Cut the video until this time", dest="end_time", action='store')
     parser.add_argument("-f", "--file", help="Process this file", dest="filename", action='store')
     parser.add_argument("-aif", "--extra-audio-aif", help="Extra mono aif audio for each language", dest="extract_aif", action='store_true')
+    parser.add_argument("--no-interact", help="No user interaction", dest="no_interact", action='store_true')
     #parser.add_argument("-aif-only", "--extract-only-audio-aif", help="Extra only mono aif audio for each language", dest="only_extract_aif", action='store_true')
     args = parser.parse_args()
     quiet_output = args.verbose
     extract_aif = args.extract_aif
+    no_interact = args.no_interact
     #only_extract_aif = args.only_extract_aif
     ##
     #    Cutting the file and exit
@@ -416,7 +434,7 @@ def main():
     ##
     # Full workflow
     ##
-    if 'filename' in args:
+    if 'filename' is None:
         dirname = os.path.dirname(args.filename)
         filename = os.path.basename(args.filename)
         process_file(filename, dirname)
