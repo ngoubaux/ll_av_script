@@ -237,6 +237,7 @@ def extract_language_tracks(file, probe):
                 ask = input('Do you want to create the audio track description file ? (Y/n)\n')
                 if ask.lower() == "y" or ask == "":
                     with open(yml_path, "a") as yml_file:
+                        yml_file.write(f"\n#Set lang: with {','.join([s for s in languages.keys() if s != '-' and s != '$'])} ")
                         yml_file.write(f"\n#tag: {md_lang}, QuickTime desc: {key_name}\ntrack_{audio_idx}:\n\tlang: ")
 
         audio_idx += 1
