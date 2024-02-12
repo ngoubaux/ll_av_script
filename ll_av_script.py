@@ -434,7 +434,7 @@ def main():
     ##
     # Full workflow
     ##
-    if 'filename' is None:
+    if args.filename is not None:
         dirname = os.path.dirname(args.filename)
         filename = os.path.basename(args.filename)
         process_file(filename, dirname)
