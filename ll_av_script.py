@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.7"
+prog_version="1.0.8"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -176,6 +176,14 @@ def search_lang_by_title(lang_title):
 
     return ""
 
+def language_entry(lang, audio_idx, md_lang):
+    return {
+            "lang": lang,
+            "audio_idx": audio_idx,
+            "metadata_lang": md_lang,
+            "metadata_title": languages[lang]["title"],
+            "join_chan": languages[lang]["channel"],
+        }
 
 def extract_language_tracks(file, probe):
     # Open Config file if present
@@ -205,7 +213,7 @@ def extract_language_tracks(file, probe):
             continue
 
         # Get Track language with Yml file
-        if yml and yml[f"track_{audio_idx+1}"] and yml[f"track_{audio_idx+1}"]["lang"]:
+        if yml and f"track_{audio_idx+1}" in yml.keys() and yml[f"track_{audio_idx+1}"] and yml[f"track_{audio_idx+1}"]["lang"]:
             lang = yml[f"track_{audio_idx+1}"]["lang"]
             md_lang = languages[lang]["lang"]
 
@@ -221,24 +229,25 @@ def extract_language_tracks(file, probe):
             lang = search_lang_by_md(md_lang)
 
         if lang != "":
-            language_tracks[lang] = {
-                "lang": lang,
-                "audio_idx": audio_idx,
-                "metadata_lang": md_lang,
-                "metadata_title": languages[lang]["title"],
-                "join_chan": languages[lang]["channel"],
-            }
+            language_tracks[lang] = language_entry(lang, audio_idx, md_lang)
         else:
-            print_warning(f"No mapped language found for Audio track_{audio_idx}")
+            print_warning(f"No mapped language found for Audio track_{audio_idx+1}")
             print_warning(f"   => Please add either a tag, a QuickTime setting or yml config file")
             print_warning(f"   => currrent tag: {md_lang}")
             print_warning(f"   => currrent QuickTime desc: {key_name}")
             if not no_interact:
-                ask = input('Do you want to create the audio track description file ? (Y/n)\n')
-                if ask.lower() == "y" or ask == "":
+                choice_lang = [s for s in languages.keys() if s != '-' and s != '$']
+                while True:
+                    ask = input(f"Fix the audio track language ? ({','.join(choice_lang)}/n)\n")
+                    if ask.upper() in choice_lang or ask.lower() == 'n':
+                        break
+
+                if ask.lower() != "n":
                     with open(yml_path, "a") as yml_file:
-                        yml_file.write(f"\n#Set lang: with {','.join([s for s in languages.keys() if s != '-' and s != '$'])} ")
-                        yml_file.write(f"\n#tag: {md_lang}, QuickTime desc: {key_name}\ntrack_{audio_idx}:\n\tlang: ")
+                        yml_file.write(f"\n# tag: {md_lang}, QuickTime desc: {key_name}\ntrack_{audio_idx+1}:\n  lang: {ask.upper()}")
+                    lang = ask.upper()
+                    md_lang = languages[lang]["lang"]
+                    language_tracks[lang] = language_entry(lang, audio_idx, md_lang)
 
         audio_idx += 1
 
