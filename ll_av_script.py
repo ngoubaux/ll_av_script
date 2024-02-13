@@ -326,8 +326,6 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
 
     # output_ffmpeg.get_args()
     _args = ffmpeg.compile(output_ffmpeg, overwrite_output=True)
-
-
     args = [arg.replace('\\\\\\\\\\\\=', '=') for arg in _args]
 
     if not quiet_output or force_args:
@@ -337,7 +335,8 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
     try:
         out, err = ffmpeg_run_cmdline(args)
         if not quiet_output:
-            print(out);
+            print(out)
+
     except ffmpeg.Error as e:
         print_error(e.stderr.decode("utf-8"))
         return False
@@ -430,7 +429,8 @@ def main():
     quiet_output = args.verbose
     extract_aif = args.extract_aif
     no_interact = args.no_interact
-    #only_extract_aif = args.only_extract_aif
+
+    print(f"ll_av_script v.{prog_version}")
     ##
     #    Cutting the file and exit
     ##
@@ -466,7 +466,8 @@ def cut_file(file, time_start, time_end):
         os.mkdir(output_dir)
 
     filename = os.path.basename(file)
-    output_base_file = os.path.join(output_dir, f"{filename}")
+    base_name, extension = os.path.splitext(filename)
+    output_base_file = os.path.join(output_dir, f"{base_name}{output_extensions}")
 
     print_step(f"Process {filename}")
     print_step(f"Simple Editing")
@@ -474,7 +475,15 @@ def cut_file(file, time_start, time_end):
     print_desc(f"\t End time: {time_end}")
 
     input_file = ffmpeg.input(file)
-    output_file = ffmpeg.output(input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'), output_base_file)
+    output_file = ffmpeg.output(
+        #input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'),
+        input_file,
+        output_base_file,
+        to=time_end,
+        ss=time_start,
+        vcodec="copy",
+        acodec="copy",
+        map=0)
     ffmpeg_run(output_file)
 
 
