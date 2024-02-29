@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.8"
+prog_version="1.0.9"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -209,7 +209,9 @@ def extract_language_tracks(file, probe):
         md_lang = ""
 
         # Get Track language with Metadata
-        if elt["codec_type"] != "audio" or elt["channels"] > 2:
+        if elt["codec_type"] != "audio" or elt["channels"] < 2:
+            if elt["codec_type"] == "audio":
+                print_warning(f"Audio track_{elt['index']} is not stereo")
             continue
 
         # Get Track language with Yml file
@@ -296,17 +298,18 @@ def ffmpeg_run_cmdline_async(
     args
 ):
     stdin_stream = None
-    stdout_stream = None
+    stdout_stream = subprocess.PIPE
     stderr_stream = subprocess.PIPE
     if quiet_output:
         stderr_stream = subprocess.STDOUT
-        stdout_stream = subprocess.DEVNULL
+        stdout_stream = subprocess.PIPE
     return subprocess.Popen(
         args,
         stdin=stdin_stream,
         stdout=stdout_stream,
         stderr=stderr_stream,
         cwd=None,
+        text=True,
     )
 
 def ffmpeg_run_cmdline(cmdline):
@@ -336,9 +339,15 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
         out, err = ffmpeg_run_cmdline(args)
         if not quiet_output:
             print(out)
+            print(err)
 
     except ffmpeg.Error as e:
-        print_error(e.stderr.decode("utf-8"))
+        print_error("ffmpeg run cmdline failed")
+        print(' '.join(args))
+        if e.stdout:
+            print(e.stdout)
+        if e.stderr:
+            print(e.stderr)
         return False
     return True
 
@@ -353,12 +362,17 @@ def get_video_resolution(probe):
         if elt["codec_type"] != "video":
             continue
 
+        if "sample_aspect_ratio" in elt:
+            aspect_radio = elt["sample_aspect_ratio"].replace(":", "/")
+        else:
+            aspect_radio = f"{elt['height']}/{elt['width']}"
+
         return (
             elt["width"],
             elt["height"],
             elt["r_frame_rate"],
             elt["codec_name"],
-            elt["sample_aspect_ratio"].replace(":", "/"),
+            aspect_radio,
         )
 
     return 0, 0, 0, 0, 0
