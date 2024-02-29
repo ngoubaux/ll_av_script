@@ -13,6 +13,8 @@ echo_ok "Install starting. You may be asked for your password (for sudo)."
 # requires xcode and tools!
 xcode-select -p || exit "XCode must be installed! (use the app store)"
 
+export PIP_BREAK_SYSTEM_PACKAGES=1
+
 # homebrew
 export HOMEBREW_CASK_OPTS="--appdir=/Applications"
 if hash brew &>/dev/null; then
@@ -61,12 +63,12 @@ if [ -x $project_name ]; then
 		backup_name="$(mktemp -d ll_av_script.XXXX)"
 		echo_ok "Backup existing ${project_name} folder to ${backup_name}..."
 		mv "${project_name}" "${backup_name}"
-	else 
+	else
 		echo_ok "Using a previous ${project_name} folder..."
 		cd ${project_name}
 	fi
 fi
-		
+
 
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
 
@@ -74,16 +76,16 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 	cd ${project_name}
 
 else
-	git pull -f --rebase 
+	git pull -f --rebase
 fi
 
 project_folder="$(pwd)"
 
 echo_ok "Setting up ${project_name} env ..."
-if [ ! -d "inputs" ]; then 	
+if [ ! -d "inputs" ]; then
 	mkdir inputs
 fi
-if [ ! -d "outputs" ]; then 	
+if [ ! -d "outputs" ]; then
 	mkdir outputs
 fi
 python3 -m pip install -r requirements.txt
