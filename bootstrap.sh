@@ -8,6 +8,19 @@ function echo_ok() { echo -e '\033[1;32m'"$1"'\033[0m'; }
 function echo_warn() { echo -e '\033[1;33m'"$1"'\033[0m'; }
 function echo_error() { echo -e '\033[1;31mERROR: '"$1"'\033[0m'; }
 
+
+if git rev-parse --git-dir > /dev/null 2>&1; then
+	echo_ok "Looking for updates."
+	git fetch
+	if [  "$(git rev-parse HEAD)" != "$(git rev-parse @{u})" ]; then
+		echo_ok "Script needs to be updated."
+		git reset --hard
+		git pull -f --rebase
+		echo_ok "Start bootstrap script again."
+		exec ./bootstrap.sh
+	fi
+fi
+
 echo_ok "Install starting. You may be asked for your password (for sudo)."
 
 # requires xcode and tools!
@@ -70,12 +83,8 @@ fi
 
 
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
-
   	git clone https://goubsi@bitbucket.org/goubsi/ll_av_script.git ${project_name} --depth 1
 	cd ${project_name}
-
-else
-	git pull -f --rebase
 fi
 
 project_folder="$(pwd)"
@@ -93,4 +102,4 @@ chmod +x ll_av_script.py
 
 echo_ok "Bootstrapping ${project_name} complete"
 echo_ok "Script is installed in ${project_folder}"
-echo_ok "You can executed by this command: cd ${project_folder}; pipenv run python3 ll_av_script.py"
+echo_ok "You can executed by this command: cd ${project_folder}; ./ll_av_script.py"
