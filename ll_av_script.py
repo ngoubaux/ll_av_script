@@ -438,6 +438,7 @@ def main():
     parser.add_argument("-f", "--file", help="Process this file", dest="filename", action='store')
     parser.add_argument("-aif", "--extra-audio-aif", help="Extra mono aif audio for each language", dest="extract_aif", action='store_true')
     parser.add_argument("--no-interact", help="No user interaction", dest="no_interact", action='store_true')
+    parser.add_argument("-e", "--edit", help="Edit the video by remove parts (<timecode_start>,<second_remove>)", dest="edit", action='append')
     #parser.add_argument("-aif-only", "--extract-only-audio-aif", help="Extra only mono aif audio for each language", dest="only_extract_aif", action='store_true')
     args = parser.parse_args()
     quiet_output = args.verbose
@@ -445,6 +446,8 @@ def main():
     no_interact = args.no_interact
 
     print(f"ll_av_script v.{prog_version}")
+
+
     ##
     #    Cutting the file and exit
     ##
@@ -466,6 +469,39 @@ def main():
         # Parcourir le dossier d'entrée
         for file in os.listdir(input_dir):
             process_file(file, input_dir)
+
+
+def edit_file(file, time_start, time_end):
+    '''
+        Cut the file between from start to end
+    '''
+    global quiet_output
+    # Path to outputs folder
+    global output_dir
+
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    filename = os.path.basename(file)
+    base_name, extension = os.path.splitext(filename)
+    output_base_file = os.path.join(output_dir, f"{base_name}{output_extensions}")
+
+    print_step(f"Process {filename}")
+    print_step(f"Simple Editing")
+    print_desc(f"\t Start time: {time_start}")
+    print_desc(f"\t End time: {time_end}")
+
+    input_file = ffmpeg.input(file)
+    output_file = ffmpeg.output(
+        #input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'),
+        input_file,
+        output_base_file,
+        to=time_end,
+        ss=time_start,
+        vcodec="copy",
+        acodec="copy",
+        map=0)
+    ffmpeg_run(output_file)
 
 
 def cut_file(file, time_start, time_end):
@@ -499,7 +535,6 @@ def cut_file(file, time_start, time_end):
         acodec="copy",
         map=0)
     ffmpeg_run(output_file)
-
 
 
 def process_file(file, input_dir):

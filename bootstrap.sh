@@ -13,8 +13,6 @@ echo_ok "Install starting. You may be asked for your password (for sudo)."
 # requires xcode and tools!
 xcode-select -p || exit "XCode must be installed! (use the app store)"
 
-export PIP_BREAK_SYSTEM_PACKAGES=1
-
 # homebrew
 export HOMEBREW_CASK_OPTS="--appdir=/Applications"
 if hash brew &>/dev/null; then
@@ -38,6 +36,7 @@ PACKAGES=(
 	python3
 	ffmpeg
     exiftool
+	pipenv
 )
 
 echo_ok "Installing packages..."
