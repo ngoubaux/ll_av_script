@@ -93,4 +93,4 @@ chmod +x ll_av_script.py
 
 echo_ok "Bootstrapping ${project_name} complete"
 echo_ok "Script is installed in ${project_folder}"
-echo_ok "You can executed by this command: cd ${project_folder}; pipenv run python3 /ll_av_script.py"
+echo_ok "You can executed by this command: cd ${project_folder}; pipenv run python3 ll_av_script.py"
