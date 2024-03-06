@@ -45,14 +45,14 @@ brew install "${PACKAGES[@]}"
 echo_ok "Cleaning up..."
 brew cleanup
 
-echo_ok "Installing Python packages..."
-PYTHON_PACKAGES=(
-	ffmpeg-python
-    PyYAML
-    pyexiftool
-	colorama
-)
-python3 -m pip install "${PYTHON_PACKAGES[@]}"
+# echo_ok "Installing Python packages..."
+# PYTHON_PACKAGES=(
+# 	ffmpeg-python
+#     PyYAML
+#     pyexiftool
+# 	colorama
+# )
+# python3 -m pip install "${PYTHON_PACKAGES[@]}"
 
 project_name="ll_av_script"
 project_folder=""
@@ -87,9 +87,10 @@ fi
 if [ ! -d "outputs" ]; then
 	mkdir outputs
 fi
-python3 -m pip install -r requirements.txt
+#python3 -m pip install -r requirements.txt
+pipenv install
 chmod +x ll_av_script.py
 
 echo_ok "Bootstrapping ${project_name} complete"
 echo_ok "Script is installed in ${project_folder}"
-echo_ok "You can executed by this command: cd ${project_folder}; ./ll_av_script.py"
+echo_ok "You can executed by this command: cd ${project_folder}; pipenv run python3 /ll_av_script.py"
