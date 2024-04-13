@@ -99,7 +99,9 @@ fi
 #python3 -m pip install -r requirements.txt
 pipenv install
 chmod +x ll_av_script.py
+chmod +x ll_sd2towav.py
 
 echo_ok "Bootstrapping ${project_name} complete"
 echo_ok "Script is installed in ${project_folder}"
 echo_ok "You can executed by this command: cd ${project_folder}; ./ll_av_script.py"
+echo_ok "                                  cd ${project_folder}; ./ll_sd2towav.py"

@@ -1,17 +1,32 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        {
+            "name": "Python: Edit option",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["-edit", "00:00:00,20", "-edit", "00:01:00,50"],
+            "env": {"PYTHONPATH": "${workspaceFolder}/mySubdir:${env:PYTHONPATH}"}
+        },
         {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": true
-            "args": ["-v"]
+            "env": {"PYTHONPATH": "${workspaceFolder}/mySubdir:${env:PYTHONPATH}"}
+        },
+        {
+            "name": "Python: sd2towav files",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["files"],
+            "env": {"PYTHONPATH": "${workspaceFolder}/mySubdir:${env:PYTHONPATH}"}
         }
     ]
 }

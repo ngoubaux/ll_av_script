@@ -8,6 +8,9 @@ ffmpeg-python = "*"
 pyyaml = "*"
 pyexiftool = "*"
 colorama = "*"
+rsrcdump = {editable = true, ref = "master", git = "git+https://github.com/jorio/rsrcdump"}
+pandas="*"
+openpyxl="*"
 
 [dev-packages]
 
