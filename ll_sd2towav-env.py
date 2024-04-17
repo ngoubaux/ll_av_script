@@ -32,6 +32,7 @@ file_template_db = {
     "sample-rate": [],
     "sample-size": [],
     "verified": [],
+    "need_sound_fix": [],
 }
 custom_header = [
     "file",
@@ -40,6 +41,7 @@ custom_header = [
     "sample-rate",
     "sample-size",
     "verified",
+    'need_sound_fix',
 ]
 
 
@@ -188,6 +190,9 @@ def main():
 
     if os.path.exists(file_db_path):
         df = pd.read_excel(file_db_path)
+        if 'need_sound_fix' not in df.columns:
+            df.insert(6, "need_sound_fix", [0] * len(df), False)
+
     else:
         df = pd.DataFrame(file_template_db)
 
@@ -199,6 +204,7 @@ def main():
             "sample-rate": int,
             "sample-size": int,
             "verified": int,
+            "need_sound_fix": int,
         }
     )
 
@@ -290,6 +296,7 @@ def convert_audio_file(input_filename, file_df):
                 "sample-rate": [sample_rate],
                 "sample-size": [sample_size],
                 "verified": [0],
+                "need_sound_fix": [0],
             },
             index=[len(df.index)],
         )
