@@ -6,16 +6,16 @@ import ffmpeg
 import os
 import glob
 import argparse
-from colorama import Fore, Back, Style, init as colorama_init
 import subprocess
-from pathlib import Path
-from pprint import pprint
+from pathlib import Patht
 import pandas as pd
+from ll_print import *
+
 
 
 colorama_init()
 
-prog_version = "0.0.1"
+prog_version = "0.0.2"
 prog_name = "ll_sd2towav"
 
 output_extension = ".aif"
