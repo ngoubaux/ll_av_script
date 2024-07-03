@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.10"
+prog_version="1.0.11"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -814,6 +814,7 @@ def create_output_file_create_surround_track(
         surround_input,
         output_file,
         vcodec="copy",
+        movflags="faststart",
         **{
             f"metadata:s:a:{len(metadata_titles)}": f"title='{'_'.join(languages_in_ouput_file)}'"
         },
@@ -852,8 +853,9 @@ def create_output_file_create_individual_language(
             vcodec="copy",
             acodec="copy",
             **{f"metadata:s:a:0": f"title='{lang['title']}'",
-            "disposition:a":  "+default",},
-        )
+            "disposition:a":  "+default", "movflags": 'faststart'
+            },
+        )#.global_args('-movflags', 'faststart')
 
         if not ffmpeg_run(output_ffmpeg):
             return False
