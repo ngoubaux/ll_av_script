@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.11"
+prog_version="1.0.12"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -26,6 +26,7 @@ output_aif_extensions = ".aif"
 
 
 quiet_output = True
+streamable = False
 extract_aif = False
 only_extract_aif = False
 # Path to outputs folder
@@ -431,8 +432,9 @@ def main():
             {lang_channel}
 
         '''))
-    parser.add_argument("-v", "--verbose", help="Make output more verbose", action="store_false")
+    parser.add_argument("-v", "--verbose", help="Make output more verbose", dest="verbose", action="store_false")
     parser.add_argument('--version', action='version', version=f"%(prog)s: {prog_version}")
+    parser.add_argument("--streaming", help="Make the video streamable", dest="streamable", action="store_true")
     parser.add_argument("-ss", "--start", help="Cut the video from this time", dest="start_time", action='store')
     parser.add_argument("-to", "--to", help="Cut the video until this time", dest="end_time", action='store')
     parser.add_argument("-f", "--file", help="Process this file", dest="filename", action='store')
@@ -441,6 +443,7 @@ def main():
     parser.add_argument("-e", "--edit", help="Edit the video by remove parts (<timecode_start>,<second_remove>)", dest="edit", action='append')
     #parser.add_argument("-aif-only", "--extract-only-audio-aif", help="Extra only mono aif audio for each language", dest="only_extract_aif", action='store_true')
     args = parser.parse_args()
+    streamable = args.streamable
     quiet_output = args.verbose
     extract_aif = args.extract_aif
     no_interact = args.no_interact
@@ -773,6 +776,8 @@ def create_output_file_create_surround_track(
     """
     Purpose: one
     """
+    global streamable
+
     # 2 - Create Sourrond track + title metadata
     print_substep(f"Surround track creating...")
     surround_map = get_surround_map(input_files, languages_in_ouput_file)
@@ -790,6 +795,11 @@ def create_output_file_create_surround_track(
             surround_streams.append(track["a:0"])
         else:
             surround_streams.append(input_file[f"a:{lang['track_idx']}"])
+
+    option = {}
+    option["vcodec"] = "copy"
+    if streamable:
+        option["movflags"] = "faststart"
 
     # Extract channel and join them
     surround_input = ffmpeg.filter_(
@@ -813,8 +823,7 @@ def create_output_file_create_surround_track(
         input_file,
         surround_input,
         output_file,
-        vcodec="copy",
-        movflags="faststart",
+        **option,
         **{
             f"metadata:s:a:{len(metadata_titles)}": f"title='{'_'.join(languages_in_ouput_file)}'"
         },
