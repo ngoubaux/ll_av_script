@@ -87,6 +87,10 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 	cd ${project_name}
 fi
 
+echo_ok "Fetching submodule ..."
+git submodule init
+git submodule update
+
 project_folder="$(pwd)"
 
 echo_ok "Setting up ${project_name} env ..."
@@ -100,8 +104,10 @@ fi
 pipenv install
 chmod +x ll_av_script.py
 chmod +x ll_sd2towav.py
+chmod +x ll_audiofix.py
 
 echo_ok "Bootstrapping ${project_name} complete"
 echo_ok "Script is installed in ${project_folder}"
 echo_ok "You can executed by this command: cd ${project_folder}; ./ll_av_script.py"
 echo_ok "                                  cd ${project_folder}; ./ll_sd2towav.py"
+echo_ok "                                  cd ${project_folder}; ./ll_audiofix.py"
