@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version = "1.0.13"
+prog_version = "1.0.14"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -838,6 +838,7 @@ def create_output_file_merge_files(
         vcodec="libx264",
         acodec="aac",
         pix_fmt="yuv420p",
+        write_tmcd="0",
         **metadata_langs,
     )
 
@@ -1027,9 +1028,6 @@ def create_output_file(
     output_file = (
         f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su{output_extensions}"
     )
-    fd, output_file_tmp = tempfile.mkstemp(
-        dir=os.path.dirname(output_file), suffix=output_extensions
-    )
 
     if only_audio:
         output_file = input_files[0]['file']
@@ -1045,6 +1043,11 @@ def create_output_file(
                 output_file, output_base_file, languages_in_ouput_file
             )
         return
+
+
+    fd, output_file_tmp = tempfile.mkstemp(
+        dir=os.path.dirname(output_file), suffix=output_extensions
+    )
 
     if not create_output_file_merge_files(
         # The above code is not doing anything. It is just a list of words "input_files" followed by
