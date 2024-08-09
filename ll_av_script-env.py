@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version="1.0.12"
+prog_version = "1.0.13"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -28,7 +28,8 @@ output_aif_extensions = ".aif"
 quiet_output = True
 streamable = False
 extract_aif = False
-only_extract_aif = False
+extract_m4a = False
+only_audio = False
 # Path to outputs folder
 output_dir = "outputs"
 no_interact = False
@@ -41,7 +42,7 @@ no_interact = False
 # http://underpop.online.fr/f/ffmpeg/help/channel-layout.htm.gz
 # https://trac.ffmpeg.org/wiki/AudioChannelManipulation
 #
-channel_layout="7.1"
+channel_layout = "7.1"
 languages = {
     "E": {
         "name": "E",
@@ -177,14 +178,16 @@ def search_lang_by_title(lang_title):
 
     return ""
 
+
 def language_entry(lang, audio_idx, md_lang):
     return {
-            "lang": lang,
-            "audio_idx": audio_idx,
-            "metadata_lang": md_lang,
-            "metadata_title": languages[lang]["title"],
-            "join_chan": languages[lang]["channel"],
-        }
+        "lang": lang,
+        "audio_idx": audio_idx,
+        "metadata_lang": md_lang,
+        "metadata_title": languages[lang]["title"],
+        "join_chan": languages[lang]["channel"],
+    }
+
 
 def extract_language_tracks(file, probe):
     # Open Config file if present
@@ -197,7 +200,6 @@ def extract_language_tracks(file, probe):
                 yml = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         print_warning(f"Error while parsing YAML file: {yml_path}")
-
 
     with exiftool.ExifToolHelper() as et:
         metadata = et.get_metadata(file)[0]
@@ -216,7 +218,12 @@ def extract_language_tracks(file, probe):
             continue
 
         # Get Track language with Yml file
-        if yml and f"track_{audio_idx+1}" in yml.keys() and yml[f"track_{audio_idx+1}"] and yml[f"track_{audio_idx+1}"]["lang"]:
+        if (
+            yml
+            and f"track_{audio_idx+1}" in yml.keys()
+            and yml[f"track_{audio_idx+1}"]
+            and yml[f"track_{audio_idx+1}"]["lang"]
+        ):
             lang = yml[f"track_{audio_idx+1}"]["lang"]
             md_lang = languages[lang]["lang"]
 
@@ -235,19 +242,25 @@ def extract_language_tracks(file, probe):
             language_tracks[lang] = language_entry(lang, audio_idx, md_lang)
         else:
             print_warning(f"No mapped language found for Audio track_{audio_idx+1}")
-            print_warning(f"   => Please add either a tag, a QuickTime setting or yml config file")
+            print_warning(
+                f"   => Please add either a tag, a QuickTime setting or yml config file"
+            )
             print_warning(f"   => currrent tag: {md_lang}")
             print_warning(f"   => currrent QuickTime desc: {key_name}")
             if not no_interact:
-                choice_lang = [s for s in languages.keys() if s != '-' and s != '$']
+                choice_lang = [s for s in languages.keys() if s != "-" and s != "$"]
                 while True:
-                    ask = input(f"Fix the audio track language ? ({','.join(choice_lang)}/n)\n")
-                    if ask.upper() in choice_lang or ask.lower() == 'n':
+                    ask = input(
+                        f"Fix the audio track language ? ({','.join(choice_lang)}/n)\n"
+                    )
+                    if ask.upper() in choice_lang or ask.lower() == "n":
                         break
 
                 if ask.lower() != "n":
                     with open(yml_path, "a") as yml_file:
-                        yml_file.write(f"\n# tag: {md_lang}, QuickTime desc: {key_name}\ntrack_{audio_idx+1}:\n  lang: {ask.upper()}")
+                        yml_file.write(
+                            f"\n# tag: {md_lang}, QuickTime desc: {key_name}\ntrack_{audio_idx+1}:\n  lang: {ask.upper()}"
+                        )
                     lang = ask.upper()
                     md_lang = languages[lang]["lang"]
                     language_tracks[lang] = language_entry(lang, audio_idx, md_lang)
@@ -295,9 +308,7 @@ def get_video_duration(probe):
     return duration
 
 
-def ffmpeg_run_cmdline_async(
-    args
-):
+def ffmpeg_run_cmdline_async(args):
     stdin_stream = None
     stdout_stream = subprocess.PIPE
     stderr_stream = subprocess.PIPE
@@ -313,16 +324,16 @@ def ffmpeg_run_cmdline_async(
         text=True,
     )
 
+
 def ffmpeg_run_cmdline(cmdline):
 
-    process = ffmpeg_run_cmdline_async(
-       cmdline
-    )
+    process = ffmpeg_run_cmdline_async(cmdline)
     out, err = process.communicate(input)
     retcode = process.poll()
     if retcode:
-        raise ffmpeg.Error('ffmpeg', out, err)
+        raise ffmpeg.Error("ffmpeg", out, err)
     return out, err
+
 
 def ffmpeg_run(output_ffmpeg, force_args=0):
     global quiet_output
@@ -330,7 +341,7 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
 
     # output_ffmpeg.get_args()
     _args = ffmpeg.compile(output_ffmpeg, overwrite_output=True)
-    args = [arg.replace('\\\\\\\\\\\\=', '=') for arg in _args]
+    args = [arg.replace("\\\\\\\\\\\\=", "=") for arg in _args]
 
     if not quiet_output or force_args:
         print(args)
@@ -344,7 +355,7 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
 
     except ffmpeg.Error as e:
         print_error("ffmpeg run cmdline failed")
-        print(' '.join(args))
+        print(" ".join(args))
         if e.stdout:
             print(e.stdout)
         if e.stderr:
@@ -352,10 +363,12 @@ def ffmpeg_run(output_ffmpeg, force_args=0):
         return False
     return True
 
+
 def get_sec(time_str):
     """Get seconds from time."""
-    h, m, s = time_str.split(':')
+    h, m, s = time_str.split(":")
     return int(h) * 3600 + int(m) * 60 + int(s)
+
 
 def get_video_resolution(probe):
     for elt in probe["streams"]:
@@ -398,7 +411,8 @@ def main():
     global quiet_output
     global output_dir
     global extract_aif
-    global only_extract_aif
+    global extract_m4a
+    global only_audio
     global no_interact
 
     # Chemin du dossier contenant les fichiers d'entrée
@@ -411,15 +425,18 @@ def main():
         os.mkdir(output_dir)
 
     # lang_keys = "   ".join(languages.keys());
-    lang_keys = " ".join('{0: <5}'.format(o["name"].replace('_', '-')) for o in languages.values())
-    lang_channel = " ".join('{0: <5}'.format(o["channel"]) for o in languages.values())
-    lang_count = " ".join('{0: <5}'.format(i) for i in range(1, 9))
+    lang_keys = " ".join(
+        "{0: <5}".format(o["name"].replace("_", "-")) for o in languages.values()
+    )
+    lang_channel = " ".join("{0: <5}".format(o["channel"]) for o in languages.values())
+    lang_count = " ".join("{0: <5}".format(i) for i in range(1, 9))
     # lang_channel = "  ".join(o["channel"] for o in languages.values())
 
     parser = argparse.ArgumentParser(
         prog="ll_av_script",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent(f'''\
+        description=textwrap.dedent(
+            f"""\
         Audio / Video Mixer
         --------------------
             Merge Audio and video file to one single file.
@@ -431,25 +448,85 @@ def main():
             {lang_keys}
             {lang_channel}
 
-        '''))
-    parser.add_argument("-v", "--verbose", help="Make output more verbose", dest="verbose", action="store_false")
-    parser.add_argument('--version', action='version', version=f"%(prog)s: {prog_version}")
-    parser.add_argument("--streaming", help="Make the video streamable", dest="streamable", action="store_true")
-    parser.add_argument("-ss", "--start", help="Cut the video from this time", dest="start_time", action='store')
-    parser.add_argument("-to", "--to", help="Cut the video until this time", dest="end_time", action='store')
-    parser.add_argument("-f", "--file", help="Process this file", dest="filename", action='store')
-    parser.add_argument("-aif", "--extra-audio-aif", help="Extra mono aif audio for each language", dest="extract_aif", action='store_true')
-    parser.add_argument("--no-interact", help="No user interaction", dest="no_interact", action='store_true')
-    parser.add_argument("-e", "--edit", help="Edit the video by remove parts (<timecode_start>,<second_remove>)", dest="edit", action='append')
-    #parser.add_argument("-aif-only", "--extract-only-audio-aif", help="Extra only mono aif audio for each language", dest="only_extract_aif", action='store_true')
+        """
+        ),
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="Make output more verbose",
+        dest="verbose",
+        action="store_false",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s: {prog_version}"
+    )
+    parser.add_argument(
+        "--streaming",
+        help="Make the video streamable",
+        dest="streamable",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-ss",
+        "--start",
+        help="Cut the video from this time",
+        dest="start_time",
+        action="store",
+    )
+    parser.add_argument(
+        "-to",
+        "--to",
+        help="Cut the video until this time",
+        dest="end_time",
+        action="store",
+    )
+    parser.add_argument(
+        "-f", "--file", help="Process this file", dest="filename", action="store"
+    )
+    parser.add_argument(
+        "-aif",
+        "--extra-audio-aif",
+        help="Extra mono aif audio for each language",
+        dest="extract_aif",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-m4a",
+        "--extra-audio-m4a",
+        help="Extra stereo audio for each language",
+        dest="extract_m4a",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--no-interact",
+        help="No user interaction",
+        dest="no_interact",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-e",
+        "--edit",
+        help="Edit the video by remove parts (<timecode_start>,<second_remove>)",
+        dest="edit",
+        action="append",
+    )
+    parser.add_argument(
+        "-audio-only",
+        "--extract-only-audio",
+        help="Extra only audio for each language",
+        dest="only_extract_audios",
+        action="store_true",
+    )
     args = parser.parse_args()
     streamable = args.streamable
     quiet_output = args.verbose
     extract_aif = args.extract_aif
+    extract_m4a = args.extract_m4a
     no_interact = args.no_interact
+    only_audio = args.only_extract_audios
 
     print(f"ll_av_script v.{prog_version}")
-
 
     ##
     #    Cutting the file and exit
@@ -475,9 +552,9 @@ def main():
 
 
 def edit_file(file, time_start, time_end):
-    '''
-        Cut the file between from start to end
-    '''
+    """
+    Cut the file between from start to end
+    """
     global quiet_output
     # Path to outputs folder
     global output_dir
@@ -496,21 +573,22 @@ def edit_file(file, time_start, time_end):
 
     input_file = ffmpeg.input(file)
     output_file = ffmpeg.output(
-        #input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'),
+        # input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'),
         input_file,
         output_base_file,
         to=time_end,
         ss=time_start,
         vcodec="copy",
         acodec="copy",
-        map=0)
+        map=0,
+    )
     ffmpeg_run(output_file)
 
 
 def cut_file(file, time_start, time_end):
-    '''
-        Cut the file between from start to end
-    '''
+    """
+    Cut the file between from start to end
+    """
     global quiet_output
     # Path to outputs folder
     global output_dir
@@ -529,35 +607,31 @@ def cut_file(file, time_start, time_end):
 
     input_file = ffmpeg.input(file)
     output_file = ffmpeg.output(
-        #input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'),
+        # input_file.trim(end=get_sec(time_end), start=get_sec(time_start)).filter('setpts', 'PTS-STARTPTS'),
         input_file,
         output_base_file,
         to=time_end,
         ss=time_start,
         vcodec="copy",
         acodec="copy",
-        map=0)
+        map=0,
+    )
     ffmpeg_run(output_file)
 
 
 def process_file(file, input_dir):
-    '''
-        Process the full workflow (Merge audio, Extract Audio, Update metadata, create Surround)
-    '''
+    """
+    Process the full workflow (Merge audio, Extract Audio, Update metadata, create Surround)
+    """
     global quiet_output
     global output_dir
-
 
     base_name, extension = os.path.splitext(file)
     input_files = []
 
     if extension == buddle_extensions or extension == video_extensions:
         # Extract basename + Language
-        pattern = (
-            "((_["
-            + "".join(list(languages.keys()))
-            + "])(?![0-9A-Za-z]))+"
-        )
+        pattern = "((_[" + "".join(list(languages.keys())) + "])(?![0-9A-Za-z]))+"
         matches = re.search(pattern, file)
         if matches:
             pos = matches.start()
@@ -644,9 +718,9 @@ def get_lang_metadata(input_files):
     metadata_langs = {}
     for item in input_files:
         for language in item["languages"].values():
-            metadata_langs[
-                f"metadata:s:a:{len(metadata_langs)}"
-            ] = f"language={language['metadata_lang']}"
+            metadata_langs[f"metadata:s:a:{len(metadata_langs)}"] = (
+                f"language={language['metadata_lang']}"
+            )
 
     return metadata_langs
 
@@ -659,9 +733,9 @@ def get_title_metadata(input_files):
     metadata_titles = {}
     for item in input_files:
         for language in item["languages"].values():
-            metadata_titles[
-                f"metadata:s:a:{len(metadata_titles)}"
-            ] = f"title='{language['metadata_title']}'"
+            metadata_titles[f"metadata:s:a:{len(metadata_titles)}"] = (
+                f"title='{language['metadata_title']}'"
+            )
 
     return metadata_titles
 
@@ -845,7 +919,7 @@ def create_output_file_create_individual_language(
     # Create one mov file for each lang
     for lang in languages.values():
         # No translation to export
-        if lang['name'] not in languages_in_ouput_file:
+        if lang["name"] not in languages_in_ouput_file:
             continue
 
         # 2 - Create individual file
@@ -861,10 +935,12 @@ def create_output_file_create_individual_language(
             output_single_file,
             vcodec="copy",
             acodec="copy",
-            **{f"metadata:s:a:0": f"title='{lang['title']}'",
-            "disposition:a":  "+default", "movflags": 'faststart'
+            **{
+                f"metadata:s:a:0": f"title='{lang['title']}'",
+                "disposition:a": "+default",
+                "movflags": "faststart",
             },
-        )#.global_args('-movflags', 'faststart')
+        )  # .global_args('-movflags', 'faststart')
 
         if not ffmpeg_run(output_ffmpeg):
             return False
@@ -881,7 +957,7 @@ def create_output_file_create_individual_aif_language(
     # Create one mov file for each lang
     for lang in languages.values():
         # No translation to export
-        if lang['name'] not in languages_in_ouput_file:
+        if lang["name"] not in languages_in_ouput_file:
             continue
 
         # 2 - Create individual file
@@ -892,11 +968,43 @@ def create_output_file_create_individual_aif_language(
         output_single_file = f"{output_base_file}_{suffix}{output_aif_extensions}"
         # Create the final command
         output_ffmpeg = ffmpeg.output(
-            ffmpeg.filter(
-                    input_file[f"a:{lang['track_idx']}"],
-                    "pan",
-                    "mono|c0=c1"),
+            ffmpeg.filter(input_file[f"a:{lang['track_idx']}"], "pan", "mono|c0=c1"),
             output_single_file,
+        )
+
+        if not ffmpeg_run(output_ffmpeg):
+            return False
+
+    return True
+
+
+def create_output_file_create_individual_m4a_language(
+    input_filename, output_base_file, languages_in_ouput_file
+):
+    """
+    Purpose: arg
+    """
+    # Create one mov file for each lang
+    for lang in languages.values():
+        # No translation to export
+        if lang["name"] not in languages_in_ouput_file:
+            continue
+
+        # 2 - Create individual file
+        print_substep(f"{lang['desc']} m4a audio generating...")
+
+        input_file = ffmpeg.input(input_filename)
+        suffix = lang["name"]
+        output_single_file = f"{output_base_file}_{suffix}{audio_extensions}"
+        # Create the final command
+        output_ffmpeg = ffmpeg.output(
+            input_file[f"a:{lang['track_idx']}"],
+            output_single_file,
+            acodec="copy",
+            **{
+                f"metadata:s:a:0": f"title='{lang['title']}'",
+                "disposition:a": "+default",
+            },
         )
 
         if not ffmpeg_run(output_ffmpeg):
@@ -913,23 +1021,38 @@ def create_output_file(
     extract_english,
 ):
     global extract_aif
-    global only_extract_aif
+    global extract_m4a
+    global only_audio
 
-    output_file = f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su{output_extensions}"
+    output_file = (
+        f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su{output_extensions}"
+    )
     fd, output_file_tmp = tempfile.mkstemp(
         dir=os.path.dirname(output_file), suffix=output_extensions
     )
 
-    if only_extract_aif:
-       create_output_file_create_individual_aif_language(
-            input_files[0]["file"], output_base_file, languages_in_ouput_file
-        )
-       return
+    if only_audio:
+        output_file = input_files[0]['file']
+        for language in input_files[0]["languages"].values():
+            languages[language["lang"]]["track_idx"] = language["audio_idx"]
+
+        if extract_aif:
+            create_output_file_create_individual_aif_language(
+                output_file, output_base_file, languages_in_ouput_file
+            )
+        else:
+            create_output_file_create_individual_m4a_language(
+                output_file, output_base_file, languages_in_ouput_file
+            )
+        return
 
     if not create_output_file_merge_files(
         # The above code is not doing anything. It is just a list of words "input_files" followed by
         # three hash symbols "
-        input_files, output_file_tmp, extra_second, extract_english
+        input_files,
+        output_file_tmp,
+        extra_second,
+        extract_english,
     ):
         os.remove(output_file_tmp)
         return False
@@ -947,6 +1070,11 @@ def create_output_file(
 
     if extract_aif:
         create_output_file_create_individual_aif_language(
+            output_file, output_base_file, languages_in_ouput_file
+        )
+
+    if extract_m4a:
+        create_output_file_create_individual_m4a_language(
             output_file, output_base_file, languages_in_ouput_file
         )
 
