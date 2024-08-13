@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version = "1.0.14"
+prog_version = "1.0.15"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -215,6 +215,10 @@ def extract_language_tracks(file, probe):
         if elt["codec_type"] != "audio" or elt["channels"] < 2:
             if elt["codec_type"] == "audio":
                 print_warning(f"Audio track_{elt['index']} is not stereo")
+            continue
+
+        # 7.1 Track Skip
+        if elt["channels"] == 8:
             continue
 
         # Get Track language with Yml file
@@ -835,9 +839,10 @@ def create_output_file_merge_files(
     output_ffmpeg = ffmpeg.output(
         *streams,
         output_file,
-        vcodec="libx264",
+        #vcodec="libx264",
+        vcodec="copy",
         acodec="aac",
-        pix_fmt="yuv420p",
+        #pix_fmt="yuv420p",
         write_tmcd="0",
         **metadata_langs,
     )

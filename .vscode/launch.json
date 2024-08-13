@@ -2,6 +2,7 @@
     "version": "0.2.0",
     "configurations": [
 
+
         {
             "name": "Python: Edit option",
             "type": "python",
@@ -17,6 +18,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "args": ["-v"],
             "env": {"PYTHONPATH": "${workspaceFolder}/mySubdir:${env:PYTHONPATH}"}
         },
         {
@@ -26,6 +28,15 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": ["files"],
+            "env": {"PYTHONPATH": "${workspaceFolder}/mySubdir:${env:PYTHONPATH}"}
+        },
+        {
+            "name": "Python: ll_audiofix.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [" ~/Downloads/20180706XX0730SR_20220812ED_beginning.m4a", "-t", "generic"],
             "env": {"PYTHONPATH": "${workspaceFolder}/mySubdir:${env:PYTHONPATH}"}
         }
     ]
