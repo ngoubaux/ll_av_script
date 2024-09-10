@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version = "1.0.15"
+prog_version = "1.0.16"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -790,13 +790,13 @@ def create_output_file_merge_files(
             if extra_second > 0:
                 video_codec = item["video_codec"]
                 streams.append(
-                    ffmpeg.concat(
-                        item["ffmpeg_input"]["v"],
-                        ffmpeg.input(
-                            f"color=c=black:s={item['width']}x{item['height']}:d={extra_second}:r={item['frame_rate']}:sar={item['sar']}",
-                            f="lavfi",
+                    ffmpeg.filter(
+                        (
+                            item["ffmpeg_input"]["v"]
                         ),
-                    )
+                        "tpad",
+                        f"stop_duration= {extra_second}",
+                    ),
                 )
             else:
                 streams.append(item["ffmpeg_input"]["v"])
@@ -840,7 +840,7 @@ def create_output_file_merge_files(
         *streams,
         output_file,
         #vcodec="libx264",
-        vcodec="copy",
+        #vcodec="copy",
         acodec="aac",
         #pix_fmt="yuv420p",
         write_tmcd="0",
