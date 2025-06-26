@@ -46,7 +46,7 @@ PACKAGES=(
 	git
 	cask
 	curl
-	python3
+	python@3.12
 	ffmpeg
     exiftool
 	pipenv
