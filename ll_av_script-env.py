@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version = "1.0.17"
+prog_version = "1.0.18"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -30,6 +30,7 @@ streamable = False
 extract_aif = False
 extract_m4a = False
 only_audio = False
+only_explode = False
 # Path to outputs folder
 output_dir = "outputs"
 no_interact = False
@@ -417,6 +418,7 @@ def main():
     global extract_aif
     global extract_m4a
     global only_audio
+    global only_explode
     global no_interact
 
     # Chemin du dossier contenant les fichiers d'entrée
@@ -522,6 +524,12 @@ def main():
         dest="only_extract_audios",
         action="store_true",
     )
+    parser.add_argument(
+        "--explode",
+        help="Explode the video into multiple files by language",
+        dest="explode_only",
+        action="store_true",
+    )
     args = parser.parse_args()
     streamable = args.streamable
     quiet_output = args.verbose
@@ -529,6 +537,7 @@ def main():
     extract_m4a = args.extract_m4a
     no_interact = args.no_interact
     only_audio = args.only_extract_audios
+    only_explode = args.explode_only
 
     print(f"ll_av_script v.{prog_version}")
 
@@ -954,6 +963,34 @@ def create_output_file_create_individual_language(
     return True
 
 
+def create_output_file_create_individual_video(
+    input_filename, output_base_file
+):
+    """
+    Purpose: arg
+    """
+    # 2 - Create individual file
+    print_substep(f"video generating...")
+
+    input_file = ffmpeg.input(input_filename)
+    output_single_file = f"{output_base_file}{output_extensions}"
+    # Create the final command
+    output_ffmpeg = ffmpeg.output(
+        input_file.video,
+        output_single_file,
+        vcodec="copy",
+        **{
+            "disposition:a": "+default",
+            "movflags": "faststart",
+        },
+    )  # .global_args('-movflags', 'faststart')
+
+    if not ffmpeg_run(output_ffmpeg):
+        return False
+
+    return True
+
+
 def create_output_file_create_individual_aif_language(
     input_filename, output_base_file, languages_in_ouput_file
 ):
@@ -971,6 +1008,8 @@ def create_output_file_create_individual_aif_language(
 
         input_file = ffmpeg.input(input_filename)
         suffix = lang["name"]
+        if suffix != "E":
+            suffix = f"E_{suffix}"
         output_single_file = f"{output_base_file}_{suffix}{output_aif_extensions}"
         # Create the final command
         output_ffmpeg = ffmpeg.output(
@@ -1001,6 +1040,8 @@ def create_output_file_create_individual_m4a_language(
 
         input_file = ffmpeg.input(input_filename)
         suffix = lang["name"]
+        if suffix != "E":
+            suffix = f"E_{suffix}"
         output_single_file = f"{output_base_file}_{suffix}{audio_extensions}"
         # Create the final command
         output_ffmpeg = ffmpeg.output(
@@ -1029,6 +1070,7 @@ def create_output_file(
     global extract_aif
     global extract_m4a
     global only_audio
+    global only_explode
 
     output_file = (
         f"{output_base_file}_{'_'.join(languages_in_ouput_file)}_Su{output_extensions}"
@@ -1047,6 +1089,19 @@ def create_output_file(
             create_output_file_create_individual_m4a_language(
                 output_file, output_base_file, languages_in_ouput_file
             )
+        return
+
+    if only_explode:
+        output_file = input_files[0]['file']
+        for language in input_files[0]["languages"].values():
+            languages[language["lang"]]["track_idx"] = language["audio_idx"]
+
+        create_output_file_create_individual_m4a_language(
+            output_file, output_base_file, languages_in_ouput_file
+        )
+        create_output_file_create_individual_video(
+            output_file, output_base_file
+        )
         return
 
 
