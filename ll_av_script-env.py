@@ -15,7 +15,7 @@ import subprocess
 
 colorama_init()
 
-prog_version = "1.0.18"
+prog_version = "1.0.19"
 
 # Liste des extensions de fichiers vidéo et audio
 buddle_extensions = ".mov"
@@ -412,6 +412,51 @@ def create_input_item(file, probe, has_video):
     }
 
 
+# Old SD productions were exported in 640x352 (or 630x352) with a wrong pixel
+# aspect ratio: they look squashed horizontally. They are rescaled to 640x360.
+squashed_resolutions = [(640, 352), (630, 352)]
+fixed_resolution = (640, 360)
+
+
+def is_squashed_resolution(item):
+    return (item["width"], item["height"]) in squashed_resolutions
+
+
+def has_timecode_track(probe):
+    """
+    True if the file holds a timecode (tmcd) track, as HD exports often do.
+    """
+    for elt in probe["streams"]:
+        if elt.get("codec_tag_string") == "tmcd":
+            return True
+    return False
+
+
+def remove_timecode_track(file):
+    """
+    Copy video and audio tracks into a temporary file without the timecode track
+    (same as: ffmpeg -i <file> -c:a copy -c:v copy -write_tmcd 0 <file_without_tcmd>)
+    Returns the temporary file path, or None on failure.
+    """
+    _, extension = os.path.splitext(file)
+    fd, output_file = tempfile.mkstemp(dir=output_dir, suffix=extension)
+    os.close(fd)
+    input_file = ffmpeg.input(file)
+    output_ffmpeg = ffmpeg.output(
+        input_file["v"],
+        input_file["a?"],
+        output_file,
+        vcodec="copy",
+        acodec="copy",
+        write_tmcd="0",
+        map_metadata="0",
+    )
+    if not ffmpeg_run(output_ffmpeg):
+        os.remove(output_file)
+        return None
+    return output_file
+
+
 def main():
     global quiet_output
     global output_dir
@@ -641,6 +686,7 @@ def process_file(file, input_dir):
 
     base_name, extension = os.path.splitext(file)
     input_files = []
+    no_timecode_file = None
 
     if extension == buddle_extensions or extension == video_extensions:
         # Extract basename + Language
@@ -659,6 +705,22 @@ def process_file(file, input_dir):
         input_files[0]["languages"] = extract_language_tracks(
             input_files[0]["file"], probe
         )
+
+        # Remove the extra timecode track (HD exports) before any processing.
+        # Languages are read above from the original file (yml, QuickTime names).
+        if has_timecode_track(probe):
+            print_substep(f"Timecode track found, removing...")
+            no_timecode_file = remove_timecode_track(input_files[0]["file"])
+            if no_timecode_file is None:
+                print_error(f"Unable to remove the timecode track, skipping {file}")
+                return
+            input_files[0]["file"] = no_timecode_file
+
+        if is_squashed_resolution(input_files[0]):
+            print_desc(
+                f"\t Resolution {input_files[0]['width']}x{input_files[0]['height']}"
+                f" will be fixed to {fixed_resolution[0]}x{fixed_resolution[1]}"
+            )
         audio_duration = get_max_audio_duration(probe)
         video_duration = get_video_duration(probe)
 
@@ -714,13 +776,17 @@ def process_file(file, input_dir):
             extract_english = True
 
         # Créer un nouveau fichier vidéo avec les pistes audio et vidéo des fichiers d'entrée
-        create_output_file(
-            input_files,
-            output_base_file,
-            languages_in_ouput_file,
-            extra_second,
-            extract_english,
-        )
+        try:
+            create_output_file(
+                input_files,
+                output_base_file,
+                languages_in_ouput_file,
+                extra_second,
+                extract_english,
+            )
+        finally:
+            if no_timecode_file and os.path.exists(no_timecode_file):
+                os.remove(no_timecode_file)
 
 
 def get_lang_metadata(input_files):
@@ -796,19 +862,20 @@ def create_output_file_merge_files(
         item["ffmpeg_input"] = ffmpeg.input(item["file"])
         # Add video track to the stream
         if item["has_video"]:
-            if extra_second > 0:
-                video_codec = item["video_codec"]
-                streams.append(
-                    ffmpeg.filter(
-                        (
-                            item["ffmpeg_input"]["v"]
-                        ),
-                        "tpad",
-                        f"stop_duration= {extra_second}",
-                    ),
+            video_stream = item["ffmpeg_input"]["v"]
+            if is_squashed_resolution(item):
+                print_substep(
+                    f"Resolution {item['width']}x{item['height']} fixing to "
+                    f"{fixed_resolution[0]}x{fixed_resolution[1]}..."
                 )
-            else:
-                streams.append(item["ffmpeg_input"]["v"])
+                video_stream = video_stream.filter(
+                    "scale", fixed_resolution[0], fixed_resolution[1]
+                ).filter("setsar", "1")
+            if extra_second > 0:
+                video_stream = video_stream.filter(
+                    "tpad", f"stop_duration= {extra_second}"
+                )
+            streams.append(video_stream)
 
         #  Extract English track from the first audio track
         if len(item["languages"]) > 0 and extract_english:
@@ -1007,9 +1074,8 @@ def create_output_file_create_individual_aif_language(
         print_substep(f"{lang['desc']} aif audio generating...")
 
         input_file = ffmpeg.input(input_filename)
+        # <filename>_<translation>.aif (no "_E" prefix for translations)
         suffix = lang["name"]
-        if suffix != "E":
-            suffix = f"E_{suffix}"
         output_single_file = f"{output_base_file}_{suffix}{output_aif_extensions}"
         # Create the final command
         output_ffmpeg = ffmpeg.output(
