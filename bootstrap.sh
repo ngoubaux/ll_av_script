@@ -9,16 +9,38 @@ function echo_warn() { echo -e '\033[1;33m'"$1"'\033[0m'; }
 function echo_error() { echo -e '\033[1;31mERROR: '"$1"'\033[0m'; }
 
 
-if git rev-parse --git-dir > /dev/null 2>&1; then
+project_name="ll_av_script"
+repo_url="https://github.com/ngoubaux/ll_av_script.git"
+
+# True if the current folder is a copy of ll_av_script (and not another git project)
+function in_project_folder() {
+	git rev-parse --git-dir > /dev/null 2>&1 &&
+		[ -f "$(git rev-parse --show-toplevel)/ll_av_script-env.py" ]
+}
+
+# Update the current ll_av_script folder to the last version.
+# Former copies cloned from Bitbucket are moved to GitHub (the history has been
+# rewritten during the migration, so a simple "git pull" is not possible).
+function update_project() {
+	cd "$(git rev-parse --show-toplevel)"
+	if [ "$(git remote get-url origin 2>/dev/null)" != "${repo_url}" ]; then
+		echo_ok "Moving ${project_name} to its new home: ${repo_url}"
+		git remote set-url origin "${repo_url}"
+	fi
 	echo_ok "Looking for updates."
-	git fetch
-	if [  "$(git rev-parse HEAD)" != "$(git rev-parse @{u})" ]; then
+	git fetch --depth 1 origin main || exit 1
+	if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
 		echo_ok "Script needs to be updated."
-		git reset --hard
-		git pull -f --rebase
+		git reset -q --hard
+		git checkout -q -B main FETCH_HEAD
+		git branch -q --set-upstream-to=origin/main main 2>/dev/null
 		echo_ok "Start bootstrap script again."
 		exec ./bootstrap.sh
 	fi
+}
+
+if in_project_folder; then
+	update_project
 fi
 
 echo_ok "Install starting. You may be asked for your password (for sudo)."
@@ -67,7 +89,6 @@ brew cleanup
 # )
 # python3 -m pip install "${PYTHON_PACKAGES[@]}"
 
-project_name="ll_av_script"
 project_folder=""
 echo_ok "Fetching last version of the ${project_name} ..."
 if [ -x $project_name ]; then
@@ -78,12 +99,13 @@ if [ -x $project_name ]; then
 	else
 		echo_ok "Using a previous ${project_name} folder..."
 		cd ${project_name}
+		update_project
 	fi
 fi
 
 
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
-  	git clone https://goubsi@bitbucket.org/goubsi/ll_av_script.git ${project_name} --depth 1
+  	git clone "${repo_url}" ${project_name} --depth 1
 	cd ${project_name}
 fi
 

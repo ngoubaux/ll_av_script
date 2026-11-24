@@ -1,6 +1,11 @@
 # Installation 
 Inside a terminal , execute this command.
-/bin/bash -c "$(curl -fsSL https://bitbucket.org/goubsi/ll_av_script/raw/main/bootstrap.sh)"
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ngoubaux/ll_av_script/main/bootstrap.sh)"
+```
+
+The same command updates an existing installation (run it from the ll_av_script folder or from its parent folder).
+Installations made from Bitbucket are moved automatically to GitHub.
 
 This script will install:
 homebrew
@@ -38,6 +43,11 @@ Get files from the folder outputs
 - Store outputs in outputs folder 
    - One Video with surround track (xxx_6.0.mov)
    - One video for each language (E(_X).mov) - where x is the lang letter.
+
+- v1.0.19
+   - Videos in 640x352 (or 630x352), which look squashed, are automatically rescaled to 640x360
+   - The extra timecode track of HD exports is automatically removed (no more manual ffmpeg -write_tmcd 0)
+   - Mono aif files (-aif) are named <filename>_<translation>.aif (e.g. _F.aif instead of _E_F.aif)
 
 # Known bug:
 For some ffmpeg reason, the surround channel ordre is not correct.
